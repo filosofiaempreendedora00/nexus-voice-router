@@ -124,6 +124,45 @@ function scoreTemplate(
   let filledRequired = 0
   const requiredCount = tpl.slots.filter((s) => s.required).length
 
+  // Command-name bonus: if the input contains a word from the template's
+  // command name (e.g. "jornada" appears in input → tpl-jornada wins over
+  // tpl-calculadora even when both share a "lead" vertical value).
+  const cmdName = tpl.command.replace(/\([^)]*\)/g, '').trim()
+  const cmdTokens = normalize(cmdName)
+    .split(' ')
+    .filter((t) => t.length >= 4)
+  let cmdHits = 0
+  const usedByCmd: number[] = []
+  for (const ct of cmdTokens) {
+    let matched = false
+    for (let i = 0; i < inputTokens.length; i++) {
+      if (usedTokens.has(i) || usedByCmd.includes(i)) continue
+      const tok = inputTokens[i]
+      if (tok === ct) { cmdHits += 1; usedByCmd.push(i); matched = true; break }
+      // singular/plural tolerance
+      if (tok === ct.replace(/s$/, '') || tok + 's' === ct) {
+        cmdHits += 0.9; usedByCmd.push(i); matched = true; break
+      }
+      if (tok.length >= 4 && editDistance(tok, ct) <= 1) {
+        cmdHits += 0.7; usedByCmd.push(i); matched = true; break
+      }
+    }
+    if (!matched) {
+      // try fuzzy against singular form too
+      const ctSing = ct.replace(/s$/, '')
+      for (let i = 0; i < inputTokens.length; i++) {
+        if (usedTokens.has(i) || usedByCmd.includes(i)) continue
+        if (ctSing.length >= 4 && editDistance(inputTokens[i], ctSing) <= 1) {
+          cmdHits += 0.6; usedByCmd.push(i); break
+        }
+      }
+    }
+  }
+  if (cmdHits > 0) {
+    totalScore += cmdHits * 1.8
+    usedByCmd.forEach((i) => usedTokens.add(i))
+  }
+
   for (const slot of tpl.slots) {
     const values = getSlotValues(tpl, slot.name)
     if (values.length === 0) continue
