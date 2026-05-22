@@ -75,6 +75,8 @@ export interface Settings {
   silenceSubmitMs: number
   vadThreshold: number
   baseUrls: BaseUrlEntry[]
+  claudeAutoEnter: boolean
+  claudeCodeApp: string
 }
 
 export type WakeState = 'idle' | 'hearing' | 'listening' | 'thinking' | 'executed' | 'error'

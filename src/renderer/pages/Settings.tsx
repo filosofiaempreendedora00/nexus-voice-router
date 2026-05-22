@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Mic, Globe, Cpu, Volume2, Radio, Link2, Plus, ArrowUp, ArrowDown, Pencil, Trash2, Check, X } from 'lucide-react'
+import { Save, Mic, Globe, Cpu, Volume2, Radio, Link2, Plus, ArrowUp, ArrowDown, Pencil, Trash2, Check, X, Terminal as TerminalIcon } from 'lucide-react'
 import type { Settings as SettingsType, BaseUrlEntry } from '@shared/types'
 import { api } from '@/lib/api'
 import { Button } from '@/components/Button'
@@ -53,6 +53,42 @@ export function Settings(): JSX.Element {
             <BaseUrlsEditor
               entries={settings.baseUrls}
               onChange={(next) => void update('baseUrls', next)}
+            />
+          </Group>
+
+          <Group icon={<TerminalIcon size={14} />} title="Ditado pro Claude Code">
+            <button
+              onClick={() => void update('claudeAutoEnter', !settings.claudeAutoEnter)}
+              className="flex items-center justify-between p-4 rounded-lg bg-bg-elevated border border-line hover:border-line-strong transition-all"
+            >
+              <div className="text-left">
+                <p className="text-sm font-medium text-ink">Auto-enviar após ditar</p>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Quando você diz "Claude, refatora X" o NEXUS cola o prompt
+                  e aperta Enter automaticamente. Desligue se quiser revisar antes.
+                </p>
+              </div>
+              <div
+                className={
+                  'w-10 h-6 rounded-full transition-all relative flex-shrink-0 ml-3 ' +
+                  (settings.claudeAutoEnter ? 'bg-accent' : 'bg-bg-hover border border-line')
+                }
+              >
+                <div
+                  className={
+                    'w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all ' +
+                    (settings.claudeAutoEnter ? 'left-[18px]' : 'left-0.5')
+                  }
+                />
+              </div>
+            </button>
+            <Input
+              label="App preferido (vazio = auto-detecta)"
+              value={settings.claudeCodeApp}
+              onChange={(e) => setSettings({ ...settings, claudeCodeApp: e.target.value })}
+              onBlur={(e) => void update('claudeCodeApp', e.target.value)}
+              placeholder="Ex: Cursor, Code, iTerm2, Terminal"
+              hint="Nome exato do app onde você roda o Claude Code. Default: tenta Cursor → VS Code → iTerm → Terminal."
             />
           </Group>
 

@@ -16,7 +16,9 @@ const DEFAULTS: Settings = {
   baseUrls: [
     { id: 'local', url: 'http://localhost:3000', label: 'Local (Octopus)' },
     { id: 'render', url: 'https://sales-jornada.onrender.com', label: 'Render (Sales Jornada)' }
-  ]
+  ],
+  claudeAutoEnter: true,
+  claudeCodeApp: 'Claude'
 }
 
 export function loadSettings(): Settings {
