@@ -1,7 +1,11 @@
 import { runOsascript, escapeForApplescript } from './osa'
+import { rewriteUrlWithActiveBase } from './url-rewrite'
+import { loadSettings } from '../store/settings'
 import type { OpAction } from '@shared/types'
 
-export async function openUrlInChrome(url: string): Promise<void> {
+export async function openUrlInChrome(rawUrl: string): Promise<void> {
+  const settings = loadSettings()
+  const url = rewriteUrlWithActiveBase(rawUrl, settings.baseUrls)
   const safe = escapeForApplescript(url)
   let origin = ''
   try {

@@ -12,7 +12,11 @@ const DEFAULTS: Settings = {
   wakeMode: true,
   wakeWord: 'nexus',
   silenceSubmitMs: 1300,
-  vadThreshold: 0.04
+  vadThreshold: 0.04,
+  baseUrls: [
+    { id: 'local', url: 'http://localhost:3000', label: 'Local (Octopus)' },
+    { id: 'render', url: 'https://sales-jornada.onrender.com', label: 'Render (Sales Jornada)' }
+  ]
 }
 
 export function loadSettings(): Settings {

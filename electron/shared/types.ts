@@ -57,6 +57,12 @@ export interface RouteMap {
 
 export type Environment = 'PROD' | 'STAGING' | 'LOCAL'
 
+export interface BaseUrlEntry {
+  id: string
+  url: string
+  label: string
+}
+
 export interface Settings {
   hotkey: string
   environment: Environment
@@ -68,6 +74,7 @@ export interface Settings {
   wakeWord: string
   silenceSubmitMs: number
   vadThreshold: number
+  baseUrls: BaseUrlEntry[]
 }
 
 export type WakeState = 'idle' | 'hearing' | 'listening' | 'thinking' | 'executed' | 'error'
