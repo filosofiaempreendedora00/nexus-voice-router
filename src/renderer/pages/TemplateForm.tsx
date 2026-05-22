@@ -20,7 +20,7 @@ export function TemplateForm({ template, onCancel, onSaved }: Props): JSX.Elemen
   const toast = useToast()
   const [command, setCommand] = useState(template?.command ?? '')
   const [urlPattern, setUrlPattern] = useState(
-    template?.urlPattern ?? 'http://localhost:3000/{slot1}/{slot2}'
+    template?.urlPattern ?? 'http://localhost:52082/{slot1}/{slot2}'
   )
   const [slots, setSlots] = useState<SlotDef[]>(template?.slots ?? [])
   const [category, setCategory] = useState(template?.category ?? 'Clientes')
@@ -151,7 +151,7 @@ export function TemplateForm({ template, onCancel, onSaved }: Props): JSX.Elemen
 
           <Input
             label="Padrão de URL"
-            placeholder="http://localhost:3000/clientes/{cliente}/{secao}"
+            placeholder="http://localhost:52082/clientes/{cliente}/{secao}"
             value={urlPattern}
             onChange={(e) => setUrlPattern(e.target.value)}
             hint="Use {placeholders} para os valores que vão se preencher por voz."
@@ -297,7 +297,7 @@ function SlotEditor({
         <div className="flex flex-col gap-2">
           <input
             type="url"
-            placeholder="http://localhost:3000/__nexus/slots"
+            placeholder="http://localhost:52082/__nexus/slots"
             value={slot.source.url}
             onChange={(e) => {
               const next = e.target.value
