@@ -26,6 +26,18 @@ const api = {
 
   transcribe: (audioBase64: string) => ipcRenderer.invoke('voice:transcribe', audioBase64),
 
+  debugMicStatus: () => ipcRenderer.invoke('debug:micStatus'),
+
+  wakeChunk: (audioBase64: string) => ipcRenderer.invoke('wake:chunk', audioBase64),
+  wakeVoiceStart: () => ipcRenderer.send('wake:voiceStart'),
+  wakeVoiceEnd: () => ipcRenderer.send('wake:voiceEnd'),
+  getWakeStatus: () => ipcRenderer.invoke('wake:getStatus'),
+  onWakeStatus: (cb: (s: unknown) => void) => {
+    const handler = (_: unknown, status: unknown): void => cb(status)
+    ipcRenderer.on('wake:status', handler)
+    return () => ipcRenderer.removeListener('wake:status', handler)
+  },
+
   hideOverlay: () => ipcRenderer.send('overlay:hide'),
   openMainWindow: () => ipcRenderer.send('window:openMain'),
 

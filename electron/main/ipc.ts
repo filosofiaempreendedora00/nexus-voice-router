@@ -1,4 +1,6 @@
-import { ipcMain } from 'electron'
+import { ipcMain, systemPreferences } from 'electron'
+import { wakeService } from './voice/wake-service'
+import { getHudWindow } from './windows'
 import {
   listRoutes,
   getRoute,
@@ -48,6 +50,36 @@ export function registerIpcHandlers(): void {
     return transcribeAudio(audioBase64)
   })
 
+  ipcMain.handle('debug:micStatus', async () => {
+    if (process.platform !== 'darwin') return { status: 'n/a' }
+    const status = systemPreferences.getMediaAccessStatus('microphone')
+    let askResult: boolean | string = 'not-asked'
+    if (status !== 'granted') {
+      try {
+        askResult = await systemPreferences.askForMediaAccess('microphone')
+      } catch (err) {
+        askResult = `error: ${err instanceof Error ? err.message : String(err)}`
+      }
+    }
+    const after = systemPreferences.getMediaAccessStatus('microphone')
+    return { status, askResult, after }
+  })
+
   ipcMain.on('overlay:hide', () => hideOverlay())
   ipcMain.on('window:openMain', () => createMainWindow())
+
+  // Wake service: receives audio chunks from capture window, broadcasts state to HUD.
+  ipcMain.handle('wake:chunk', async (_e, audioBase64: string) => {
+    await wakeService.processChunk(audioBase64)
+  })
+  ipcMain.on('wake:voiceStart', () => wakeService.onVoiceStart())
+  ipcMain.on('wake:voiceEnd', () => wakeService.onVoiceEnd())
+  ipcMain.handle('wake:getStatus', () => wakeService.getStatus())
+
+  wakeService.on('status', (status) => {
+    const hud = getHudWindow()
+    if (hud && !hud.isDestroyed()) {
+      hud.webContents.send('wake:status', status)
+    }
+  })
 }

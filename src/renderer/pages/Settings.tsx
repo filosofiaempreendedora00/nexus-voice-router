@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Mic, Globe, Cpu, Volume2 } from 'lucide-react'
+import { Save, Mic, Globe, Cpu, Volume2, Radio } from 'lucide-react'
 import type { Settings as SettingsType } from '@shared/types'
 import { api } from '@/lib/api'
 import { Button } from '@/components/Button'
@@ -46,6 +46,37 @@ export function Settings(): JSX.Element {
               onBlur={(e) => void update('hotkey', e.target.value)}
               hint='Formato Electron. Ex: "CommandOrControl+Shift+Space"'
             />
+          </Group>
+
+          <Group icon={<Radio size={14} />} title="Modo hands-free (wake word)">
+            <button
+              onClick={() => void update('wakeMode', !settings.wakeMode)}
+              className="flex items-center justify-between p-4 rounded-lg bg-bg-elevated border border-line hover:border-line-strong transition-all"
+            >
+              <div className="text-left">
+                <p className="text-sm font-medium text-ink">Sempre ouvindo a palavra "Nexus"</p>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Indicador no canto da tela. Microfone fica ativo em background.
+                  Comando submete automaticamente após 1.3s de silêncio.
+                </p>
+              </div>
+              <div
+                className={
+                  'w-10 h-6 rounded-full transition-all relative flex-shrink-0 ml-3 ' +
+                  (settings.wakeMode ? 'bg-accent' : 'bg-bg-hover border border-line')
+                }
+              >
+                <div
+                  className={
+                    'w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all ' +
+                    (settings.wakeMode ? 'left-[18px]' : 'left-0.5')
+                  }
+                />
+              </div>
+            </button>
+            <p className="text-[11px] text-ink-dim mt-1">
+              Mudanças surtem efeito ao reiniciar o NEXUS.
+            </p>
           </Group>
 
           <Group icon={<Globe size={14} />} title="Ambiente">

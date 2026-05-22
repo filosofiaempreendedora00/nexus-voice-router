@@ -7,3 +7,5 @@ dist/
 .idea/
 data/
 resources/models/
+*.tsbuildinfo
+

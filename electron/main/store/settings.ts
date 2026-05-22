@@ -8,7 +8,11 @@ const DEFAULTS: Settings = {
   aiFallbackEnabled: false,
   whisperModel: 'base',
   language: 'pt',
-  firstRunCompleted: false
+  firstRunCompleted: false,
+  wakeMode: true,
+  wakeWord: 'nexus',
+  silenceSubmitMs: 1300,
+  vadThreshold: 0.04
 }
 
 export function loadSettings(): Settings {

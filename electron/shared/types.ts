@@ -64,6 +64,18 @@ export interface Settings {
   whisperModel: 'tiny' | 'base' | 'small'
   language: string
   firstRunCompleted: boolean
+  wakeMode: boolean
+  wakeWord: string
+  silenceSubmitMs: number
+  vadThreshold: number
+}
+
+export type WakeState = 'idle' | 'hearing' | 'listening' | 'thinking' | 'executed' | 'error'
+
+export interface WakeStatus {
+  state: WakeState
+  message?: string
+  buffer?: string
 }
 
 export interface HistoryEntry {
@@ -157,6 +169,14 @@ declare global {
       execute: (input: string) => Promise<ExecuteResult>
       executeChoice: (input: string, candidate: NavCandidate) => Promise<ExecuteResult>
       transcribe: (audioBase64: string) => Promise<string>
+      debugMicStatus: () => Promise<{ status: string; askResult?: boolean | string; after?: string }>
+
+      wakeChunk: (audioBase64: string) => Promise<void>
+      wakeVoiceStart: () => void
+      wakeVoiceEnd: () => void
+      onWakeStatus: (cb: (s: WakeStatus) => void) => () => void
+      getWakeStatus: () => Promise<WakeStatus>
+
       hideOverlay: () => void
       onOverlayShow: (cb: () => void) => () => void
       openMainWindow: () => void

@@ -34,10 +34,20 @@ export function stripAccents(s: string): string {
 }
 
 export function normalize(input: string): string {
-  return stripAccents(input.toLowerCase())
+  // Merge spelled-out letter sequences first (e.g. "C-R-O" -> "cro", "C R O" -> "cro").
+  const lettersMerged = mergeSpelledLetters(input)
+  return stripAccents(lettersMerged.toLowerCase())
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function mergeSpelledLetters(input: string): string {
+  // "C-R-O" / "C.R.O" / "C R O" -> "CRO" (3+ consecutive single letters joined)
+  let out = input.replace(/(?<![A-Za-zÀ-ú])([A-Za-zÀ-ú])[\s\.\-]([A-Za-zÀ-ú])[\s\.\-]([A-Za-zÀ-ú])(?![A-Za-zÀ-ú])/g, '$1$2$3')
+  // Also handle 2-letter sequences (less common but harmless): "C R" -> "CR"
+  out = out.replace(/(?<![A-Za-zÀ-ú])([A-Za-zÀ-ú])[\.\-]([A-Za-zÀ-ú])(?![A-Za-zÀ-ú])/g, '$1$2')
+  return out
 }
 
 export function tokenize(input: string): string[] {

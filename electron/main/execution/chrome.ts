@@ -3,30 +3,49 @@ import type { OpAction } from '@shared/types'
 
 export async function openUrlInChrome(url: string): Promise<void> {
   const safe = escapeForApplescript(url)
+  let origin = ''
+  try {
+    origin = new URL(url).origin
+  } catch {
+    /* keep empty */
+  }
+  const safeOrigin = escapeForApplescript(origin)
+
   const script = `
 tell application "Google Chrome"
   activate
+  set theURL to "${safe}"
+  set targetOrigin to "${safeOrigin}"
+  set foundWindow to missing value
+  set foundTabIdx to 0
+
   if (count of windows) = 0 then
     make new window
-    set URL of active tab of front window to "${safe}"
-  else
-    set existingTab to missing value
-    set targetUrl to "${safe}"
+    set URL of active tab of front window to theURL
+    return
+  end if
+
+  if targetOrigin is not "" then
     repeat with w in windows
+      set i to 0
       repeat with t in tabs of w
-        if URL of t starts with targetUrl then
-          set existingTab to t
-          set index of w to 1
+        set i to i + 1
+        if (URL of t) starts with targetOrigin then
+          set foundWindow to w
+          set foundTabIdx to i
           exit repeat
         end if
       end repeat
-      if existingTab is not missing value then exit repeat
+      if foundWindow is not missing value then exit repeat
     end repeat
-    if existingTab is missing value then
-      tell front window to make new tab with properties {URL:"${safe}"}
-    else
-      tell front window to set active tab index to (index of existingTab as integer)
-    end if
+  end if
+
+  if foundWindow is missing value then
+    tell front window to make new tab with properties {URL:theURL}
+  else
+    set active tab index of foundWindow to foundTabIdx
+    set URL of tab foundTabIdx of foundWindow to theURL
+    set index of foundWindow to 1
   end if
 end tell
 `
