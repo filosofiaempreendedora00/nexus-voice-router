@@ -1,0 +1,53 @@
+import { ipcMain } from 'electron'
+import {
+  listRoutes,
+  getRoute,
+  upsertRoute,
+  deleteRoute,
+  listTemplates,
+  getTemplate,
+  upsertTemplate,
+  deleteTemplate
+} from './store/routes'
+import { loadSettings, saveSettings } from './store/settings'
+import { listHistory } from './store/history'
+import { classifyOnly, executeInput, executeChoice } from './router/executor'
+import { transcribeAudio } from './voice/whisper'
+import { refreshTemplate } from './router/slot-discovery'
+import { hideOverlay, createMainWindow } from './windows'
+import { rebindHotkey } from './hotkey'
+
+export function registerIpcHandlers(): void {
+  ipcMain.handle('routes:list', () => listRoutes())
+  ipcMain.handle('routes:get', (_e, id: string) => getRoute(id))
+  ipcMain.handle('routes:save', (_e, route) => upsertRoute(route))
+  ipcMain.handle('routes:delete', (_e, id: string) => deleteRoute(id))
+
+  ipcMain.handle('templates:list', () => listTemplates())
+  ipcMain.handle('templates:get', (_e, id: string) => getTemplate(id))
+  ipcMain.handle('templates:save', (_e, tpl) => upsertTemplate(tpl))
+  ipcMain.handle('templates:delete', (_e, id: string) => deleteTemplate(id))
+  ipcMain.handle('templates:refreshSlots', (_e, id: string) => refreshTemplate(id))
+
+  ipcMain.handle('settings:get', () => loadSettings())
+  ipcMain.handle('settings:save', (_e, patch) => {
+    const next = saveSettings(patch)
+    if (patch.hotkey) rebindHotkey(next.hotkey)
+    return next
+  })
+
+  ipcMain.handle('history:list', (_e, limit?: number) => listHistory(limit))
+
+  ipcMain.handle('router:classify', (_e, input: string) => classifyOnly(input))
+  ipcMain.handle('router:execute', (_e, input: string) => executeInput(input))
+  ipcMain.handle('router:executeChoice', (_e, input: string, candidate) =>
+    executeChoice(input, candidate)
+  )
+
+  ipcMain.handle('voice:transcribe', async (_e, audioBase64: string) => {
+    return transcribeAudio(audioBase64)
+  })
+
+  ipcMain.on('overlay:hide', () => hideOverlay())
+  ipcMain.on('window:openMain', () => createMainWindow())
+}

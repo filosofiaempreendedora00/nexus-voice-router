@@ -1,0 +1,18 @@
+appId: com.roberto.nexus
+productName: NEXUS Voice Router
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**/*
+  - package.json
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  hardenedRuntime: false
+  gatekeeperAssess: false
+asar: true

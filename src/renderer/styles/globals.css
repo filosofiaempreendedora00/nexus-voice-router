@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root, #overlay-root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+                 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: theme('colors.ink.DEFAULT');
+  }
+  ::selection {
+    background-color: theme('colors.accent.subtle');
+    color: theme('colors.ink.DEFAULT');
+  }
+}
+
+@layer components {
+  .titlebar {
+    -webkit-app-region: drag;
+    height: 38px;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+  .glass {
+    background: rgba(17, 17, 20, 0.72);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+  }
+  .card {
+    @apply bg-bg-elevated border border-line rounded-xl;
+  }
+  .card-hover {
+    @apply transition-all duration-150 hover:bg-bg-hover hover:border-line-strong;
+  }
+  .scroll-area {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.line.strong') transparent;
+  }
+  .scroll-area::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-area::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-area::-webkit-scrollbar-thumb {
+    background-color: theme('colors.line.strong');
+    border-radius: 4px;
+  }
+  .kbd {
+    @apply inline-flex items-center justify-center
+           text-[10px] font-mono font-semibold
+           px-1.5 py-0.5 rounded-md
+           bg-bg-elevated border border-line text-ink-muted;
+  }
+}
