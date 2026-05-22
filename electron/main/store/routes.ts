@@ -6,8 +6,8 @@ import { readJson, writeJson } from './json-file'
 const DEFAULTS: RouteMap = {
   version: 2,
   baseUrls: {
-    PROD: 'http://localhost:52082',
-    LOCAL: 'http://localhost:52082'
+    PROD: 'http://localhost:3000',
+    LOCAL: 'http://localhost:3000'
   },
   categories: ['Clientes', 'Apps', 'Ferramentas', 'Pessoal'],
   routes: [
@@ -16,7 +16,7 @@ const DEFAULTS: RouteMap = {
       command: 'Organiker Investimento',
       aliases: ['preço organiker', 'proposta organiker', 'investimento organiker'],
       keywords: ['organiker', 'investimento', 'preço', 'valor', 'proposta'],
-      url: 'http://localhost:52082/clientes/organiker/investimento',
+      url: 'http://localhost:3000/clientes/organiker/investimento',
       category: 'Clientes',
       icon: '💰',
       useCount: 0,
@@ -28,7 +28,7 @@ const DEFAULTS: RouteMap = {
     {
       id: 'tpl-cliente-secao',
       command: 'Cliente · Seção',
-      urlPattern: 'http://localhost:52082/clientes/{cliente}/{secao}',
+      urlPattern: 'http://localhost:3000/clientes/{cliente}/{secao}',
       slots: [
         {
           name: 'cliente',
