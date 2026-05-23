@@ -7,7 +7,7 @@ const SPEECH_THRESHOLD = 0.04        // RMS threshold for speech detection
 const SPEECH_START_FRAMES = 3        // ~200ms of energy before triggering
 const SPEECH_END_FRAMES = 20         // ~1.28s of silence to end utterance
 const PRE_ROLL_FRAMES = 6            // ~380ms of audio kept before speech onset
-const MAX_CHUNK_FRAMES = 250         // ~16s safety cap
+const MAX_CHUNK_FRAMES = 470         // ~30s safety cap
 
 export function Capture(): JSX.Element {
   const started = useRef(false)
@@ -64,14 +64,26 @@ async function start(): Promise<void> {
       speechBuffer.push(frame)
       if (isVoiced) {
         silentFrames = 0
+        // Force-flush mid-speech (chunk too long) but DON'T signal voice end.
+        // Speech is continuing — wake-service shouldn't start its silence timer.
+        if (speechBuffer.length >= MAX_CHUNK_FRAMES) {
+          flush(speechBuffer, ctx.sampleRate)
+          // Start a fresh buffer immediately, retaining some pre-roll context.
+          speechBuffer = recent.slice(-2)
+          silentFrames = 0
+        }
       } else {
         silentFrames += 1
-        if (silentFrames >= SPEECH_END_FRAMES || speechBuffer.length >= MAX_CHUNK_FRAMES) {
+        if (silentFrames >= SPEECH_END_FRAMES) {
           flush(speechBuffer, ctx.sampleRate)
           api.wakeVoiceEnd()
           speechBuffer = null
           voicedFrames = 0
           silentFrames = 0
+        } else if (speechBuffer.length >= MAX_CHUNK_FRAMES) {
+          // Even mid-low-energy can hit cap — still force-flush without signaling end.
+          flush(speechBuffer, ctx.sampleRate)
+          speechBuffer = recent.slice(-2)
         }
       }
     }

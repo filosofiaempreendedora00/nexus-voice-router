@@ -11,7 +11,8 @@ export function Hud(): JSX.Element {
     void api.getWakeStatus().then(setStatus)
     return api.onWakeStatus((s) => {
       setStatus(s)
-      if (s.state === 'listening' && prevState.current !== 'listening') {
+      // Dramatic bounce animation only on commit (thinking), not on listening start.
+      if (s.state === 'thinking' && prevState.current !== 'thinking') {
         setWakeKey((k) => k + 1)
       }
       prevState.current = s.state
@@ -38,17 +39,15 @@ function Orb({ state, wakeKey }: { state: WakeState; wakeKey: number }): JSX.Ele
 
   return (
     <div
-      key={isListening ? `wake-${wakeKey}` : `s-${state}`}
+      key={isThinking ? `wake-${wakeKey}` : `s-${state}`}
       className={`orb orb-${state}`}
     >
-      {/* Rotating comet ring — only when listening, gives the "alive" feel */}
-      {isListening && <div className="ring ring-listening" />}
-      {/* Subtler ring on hearing for instant feedback */}
-      {isHearing && <div className="ring ring-hearing" />}
-      {/* Thinking has a gentler ring */}
-      {isThinking && <div className="ring ring-thinking" />}
-      {/* Outer glow halo — circular, breathing */}
-      {(isListening || isExecuted || isError) && <div className={`halo halo-${state}`} />}
+      {/* Subtle ring while hearing/listening — both look the same to the user */}
+      {(isHearing || isListening) && <div className="ring ring-hearing" />}
+      {/* Thinking gets the dramatic rotating comet ring (commit moment) */}
+      {isThinking && <div className="ring ring-listening" />}
+      {/* Outer glow halo — only on commit (thinking) and result states */}
+      {(isThinking || isExecuted || isError) && <div className={`halo halo-${isThinking ? 'listening' : state}`} />}
       {/* Core orb with gradient */}
       <div className="core" />
       {/* Specular highlight */}
@@ -152,26 +151,17 @@ body { background: transparent; margin: 0; }
   to   { opacity: 1; transform: scale(1); }
 }
 
-/* LISTENING — the showcase state */
+/* LISTENING — kept visually identical to HEARING so the user sees no premature
+   transformation while they speak. The dramatic visual is reserved for THINKING. */
 .orb-listening {
-  width: 38px;
-  height: 38px;
-  animation: wakeBounce 540ms cubic-bezier(0.34, 1.5, 0.64, 1) 1,
-             listenBreathe 2.6s ease-in-out 540ms infinite;
+  width: 28px;
+  height: 28px;
 }
 .orb-listening .core {
   background: radial-gradient(circle at 32% 24%,
-    var(--purple-bright) 0%,
-    var(--purple) 45%,
-    var(--purple-deep) 100%);
-  border-color: rgba(180, 184, 255, 0.5);
-  box-shadow:
-    0 0 0 1px rgba(180, 184, 255, 0.35),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.25),
-    inset 0 2px 4px rgba(255, 255, 255, 0.18);
-}
-.orb-listening .shine {
-  background: radial-gradient(ellipse at center, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%);
+    rgba(180, 184, 255, 0.18) 0%,
+    rgba(40, 40, 56, 0.96) 75%);
+  border-color: rgba(124, 127, 246, 0.25);
 }
 
 .halo-listening {
@@ -220,36 +210,28 @@ body { background: transparent; margin: 0; }
   to { transform: rotate(360deg); }
 }
 
-/* THINKING */
+/* THINKING — the showcase / commit moment.
+   Inherits the dramatic look the previous "listening" had: full purple gradient,
+   wake bounce animation on entry, rotating comet ring, breathing halo. */
 .orb-thinking {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
+  animation: wakeBounce 540ms cubic-bezier(0.34, 1.5, 0.64, 1) 1,
+             listenBreathe 2.6s ease-in-out 540ms infinite;
 }
 .orb-thinking .core {
   background: radial-gradient(circle at 32% 24%,
-    rgba(180, 184, 255, 0.6) 0%,
-    var(--purple-deep) 60%,
-    rgba(60, 62, 160, 0.95) 100%);
-  border-color: rgba(124, 127, 246, 0.5);
+    var(--purple-bright) 0%,
+    var(--purple) 45%,
+    var(--purple-deep) 100%);
+  border-color: rgba(180, 184, 255, 0.5);
   box-shadow:
-    0 0 0 1px rgba(124, 127, 246, 0.25),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.3);
+    0 0 0 1px rgba(180, 184, 255, 0.35),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.25),
+    inset 0 2px 4px rgba(255, 255, 255, 0.18);
 }
-
-.ring-thinking {
-  position: absolute;
-  inset: -6px;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    rgba(180, 184, 255, 0.55) 0deg,
-    rgba(180, 184, 255, 0) 200deg,
-    rgba(180, 184, 255, 0.55) 360deg
-  );
-  -webkit-mask: radial-gradient(circle, transparent 62%, black 65%, black 72%, transparent 75%);
-          mask: radial-gradient(circle, transparent 62%, black 65%, black 72%, transparent 75%);
-  animation: ringSpin 1.4s linear infinite;
-  opacity: 0.85;
+.orb-thinking .shine {
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%);
 }
 
 /* EXECUTED */
