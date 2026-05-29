@@ -146,6 +146,17 @@ export function Mobile(): JSX.Element {
             </button>
           </section>
 
+          {/* Backend preference — force Tailscale or auto-pick */}
+          <TunnelPreferenceCard
+            current={settings?.mobileTunnelPreference ?? 'auto'}
+            onChange={async (pref) => {
+              const next = await api.saveSettings({ mobileTunnelPreference: pref })
+              setSettings(next)
+              toast.show('success', 'Preferência salva — desliga e religa pra aplicar')
+            }}
+            activeKind={status.tunnel.kind}
+          />
+
           {/* Tailscale Funnel — the preferred stable-URL path. */}
           <TailscaleCard
             tailscale={status.tunnel.tailscale}
@@ -319,6 +330,92 @@ function preferredUrl(s: MobileStatus | null): string | null {
   if (!s || !s.enabled) return null
   if (s.tunnel.url) return s.tunnel.url
   return s.lanUrl
+}
+
+/**
+ * Backend preference card — locks Roberto in on a specific tunnel choice so
+ * timing races between "Mac just woke up" and "Tailscale daemon ready" stop
+ * silently falling back to cloudflared. When "Forçar Tailscale" is picked,
+ * the tunnel manager retries the Tailscale probe up to 6 times before
+ * giving up.
+ */
+function TunnelPreferenceCard({
+  current,
+  onChange,
+  activeKind
+}: {
+  current: 'auto' | 'tailscale' | 'cloudflared' | 'ngrok'
+  onChange: (pref: 'auto' | 'tailscale' | 'cloudflared' | 'ngrok') => void
+  activeKind: MobileStatus['tunnel']['kind']
+}): JSX.Element {
+  const options: { value: typeof current; label: string; hint: string }[] = [
+    {
+      value: 'auto',
+      label: 'Auto',
+      hint: 'Tenta Tailscale, depois ngrok, depois cloudflared. Retry curto.'
+    },
+    {
+      value: 'tailscale',
+      label: 'Forçar Tailscale',
+      hint: 'URL fixa pra sempre. Retry agressivo (6 tentativas em 6s).'
+    },
+    {
+      value: 'cloudflared',
+      label: 'Cloudflared (URL descartável)',
+      hint: 'URL muda toda sessão. Funciona sem setup nenhum.'
+    }
+  ]
+
+  return (
+    <section className="card p-4 sm:p-5 flex flex-col gap-3">
+      <div>
+        <h2 className="text-sm font-semibold text-ink">Preferência de backend</h2>
+        <p className="text-xs text-ink-muted">
+          Qual túnel o NEXUS deve usar quando você liga o Mobile.
+        </p>
+      </div>
+      <div className="flex flex-col gap-2">
+        {options.map((opt) => {
+          const isSelected = current === opt.value
+          const isLive = activeKind === opt.value
+          return (
+            <button
+              key={opt.value}
+              onClick={() => !isSelected && onChange(opt.value)}
+              className={cn(
+                'text-left p-3 rounded-lg border transition-all',
+                isSelected
+                  ? 'border-accent/50 bg-accent-subtle/40'
+                  : 'border-line bg-bg-elevated hover:bg-bg-hover hover:border-line-strong'
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className={cn('text-sm font-medium', isSelected ? 'text-ink' : 'text-ink-muted')}>
+                  {opt.label}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {isLive && (
+                    <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-success/15 text-success">
+                      Em uso
+                    </span>
+                  )}
+                  {isSelected && !isLive && (
+                    <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-accent-subtle text-accent">
+                      Selecionado
+                    </span>
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-ink-dim mt-0.5">{opt.hint}</p>
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-[10px] text-ink-dim leading-relaxed">
+        Mudança aplica na próxima vez que você ligar o Mobile (Desligar → Ligar).
+      </p>
+    </section>
+  )
 }
 
 /**

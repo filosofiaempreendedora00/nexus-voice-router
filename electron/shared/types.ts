@@ -83,6 +83,17 @@ export interface Settings {
   // ngrok instead of the disposable cloudflared quick tunnel.
   ngrokAuthtoken: string
   ngrokStaticDomain: string
+  /**
+   * Which tunnel backend to use for the Mobile feature:
+   *   - 'auto': try tailscale → ngrok (if configured) → cloudflared, with
+   *     a short retry on tailscale to absorb daemon-not-ready races
+   *   - 'tailscale': aggressively retry tailscale; do NOT silently fall
+   *     back to cloudflared. Use this when you've committed to Tailscale
+   *     and want the stable URL guaranteed every session.
+   *   - 'cloudflared': always use the disposable trycloudflare.com tunnel.
+   *   - 'ngrok': use ngrok with the configured authtoken+domain.
+   */
+  mobileTunnelPreference: 'auto' | 'tailscale' | 'cloudflared' | 'ngrok'
 }
 
 // =============== Agents (NEXUS-managed Claude conversations) ===============

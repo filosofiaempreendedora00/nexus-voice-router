@@ -128,20 +128,57 @@ function isNgrokConfigured(): { authtoken: string; domain: string } | null {
 }
 
 /**
- * Decide which backend would be used right now. Priority is fixed:
- * Tailscale (best) > ngrok (if user paid/legacy) > cloudflared (fallback).
- * Used at start-tunnel time AND for the UI to show what WILL be used.
+ * Decide which backend to use, respecting the user's `mobileTunnelPreference`
+ * setting:
+ *
+ *   - 'tailscale': retry the Tailscale probe up to 6 times (1s apart) before
+ *     giving up. Most "Tailscale not ready" failures are timing races right
+ *     after the Mac wakes from sleep — retry absorbs them. NEVER silently
+ *     falls back; if Tailscale truly can't come up, returns 'cloudflared'
+ *     so the user at least has something working, but ideally the user
+ *     should fix Tailscale.
+ *
+ *   - 'ngrok': use ngrok if configured + binary present; else fall through.
+ *
+ *   - 'cloudflared': always use the disposable cloudflared quick tunnel.
+ *
+ *   - 'auto' (default): prefer tailscale (with 3-attempt retry), then ngrok,
+ *     then cloudflared. The retry on tailscale is what fixes the recurring
+ *     "Roberto opens NEXUS right after Mac wake-up and gets cloudflared"
+ *     problem.
  */
 async function chooseBackend(): Promise<'tailscale' | 'ngrok' | 'cloudflared'> {
-  const tsBin = await findTailscale()
-  if (tsBin) {
-    const state = await tailscaleProbe(tsBin)
-    if (state === 'ready') return 'tailscale'
+  const pref = (loadSettings().mobileTunnelPreference || 'auto') as
+    'auto' | 'tailscale' | 'ngrok' | 'cloudflared'
+
+  console.log('[tunnel] choosing backend, preference:', pref)
+
+  const probeTailscaleWithRetry = async (attempts: number): Promise<boolean> => {
+    const bin = await findTailscale()
+    if (!bin) {
+      console.log('[tunnel] tailscale binary not found')
+      return false
+    }
+    for (let i = 0; i < attempts; i++) {
+      const state = await tailscaleProbe(bin)
+      console.log(`[tunnel] tailscale probe ${i + 1}/${attempts}: ${state}`)
+      if (state === 'ready') return true
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1000))
+    }
+    return false
   }
-  if (isNgrokConfigured()) {
-    const ngrokBin = await findNgrok()
-    if (ngrokBin) return 'ngrok'
+
+  if (pref === 'cloudflared') return 'cloudflared'
+  if (pref === 'ngrok' && isNgrokConfigured() && (await findNgrok())) return 'ngrok'
+  if (pref === 'tailscale') {
+    const ok = await probeTailscaleWithRetry(6)
+    if (ok) return 'tailscale'
+    console.warn('[tunnel] preference is tailscale but probe failed 6x; falling back to cloudflared')
+    return 'cloudflared'
   }
+  // 'auto'
+  if (await probeTailscaleWithRetry(3)) return 'tailscale'
+  if (isNgrokConfigured() && (await findNgrok())) return 'ngrok'
   return 'cloudflared'
 }
 

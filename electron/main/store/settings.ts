@@ -22,7 +22,8 @@ const DEFAULTS: Settings = {
   anthropicApiKey: '',
   anthropicModel: 'claude-sonnet-4-5-20250929',
   ngrokAuthtoken: '',
-  ngrokStaticDomain: ''
+  ngrokStaticDomain: '',
+  mobileTunnelPreference: 'auto'
 }
 
 export function loadSettings(): Settings {
