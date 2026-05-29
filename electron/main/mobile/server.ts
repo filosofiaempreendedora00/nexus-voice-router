@@ -9,6 +9,7 @@ import appJs from './static/app.js?raw'
 import styleCss from './static/style.css?raw'
 import manifestJson from './static/manifest.json?raw'
 import { ICON_PNG_BASE64 } from './static/icon-png'
+import { ICON_SQUARE_180_BASE64, ICON_SQUARE_512_BASE64 } from './static/icon-png-square'
 
 const PORT = 47823
 
@@ -17,9 +18,18 @@ interface StaticFile {
   contentType: string
 }
 
-// Decode the icon once at module init so each request is a cheap reference,
+// Decode the icons once at module init so each request is a cheap reference,
 // not a base64 decode.
+// - ICON_PNG_BUFFER: the rounded-corner version (with transparent corners).
+//   Used for the browser favicon and the <img> shown inside the PWA header
+//   where the rounded corners look natural against the page background.
+// - SQUARE_180 / SQUARE_512: full-square versions with NO transparent pixels.
+//   Used for the apple-touch-icon link and the maskable PWA manifest entry,
+//   so iOS doesn't show a white background around the rounded shape when
+//   adding the PWA to the home screen. iOS applies its own rounded mask.
 const ICON_PNG_BUFFER = Buffer.from(ICON_PNG_BASE64, 'base64')
+const SQUARE_180 = Buffer.from(ICON_SQUARE_180_BASE64, 'base64')
+const SQUARE_512 = Buffer.from(ICON_SQUARE_512_BASE64, 'base64')
 
 const STATIC_ROUTES: Record<string, StaticFile> = {
   '/': { body: indexHtml, contentType: 'text/html; charset=utf-8' },
@@ -27,9 +37,15 @@ const STATIC_ROUTES: Record<string, StaticFile> = {
   '/app.js': { body: appJs, contentType: 'text/javascript; charset=utf-8' },
   '/style.css': { body: styleCss, contentType: 'text/css; charset=utf-8' },
   '/manifest.json': { body: manifestJson, contentType: 'application/json; charset=utf-8' },
+
+  // Rounded (used inside the PWA page itself)
   '/icon.png': { body: ICON_PNG_BUFFER, contentType: 'image/png' },
-  '/icon-180.png': { body: ICON_PNG_BUFFER, contentType: 'image/png' },
-  '/icon-512.png': { body: ICON_PNG_BUFFER, contentType: 'image/png' }
+
+  // Full-square — iOS home-screen icon, Android maskable
+  '/icon-180.png': { body: SQUARE_180, contentType: 'image/png' },
+  '/icon-512.png': { body: SQUARE_512, contentType: 'image/png' },
+  '/apple-touch-icon.png': { body: SQUARE_180, contentType: 'image/png' },
+  '/apple-touch-icon-precomposed.png': { body: SQUARE_180, contentType: 'image/png' }
 }
 
 // ============== Connection registry ==============
@@ -161,9 +177,15 @@ function handleHttp(req: IncomingMessage, res: ServerResponse): void {
     res.end('Not found')
     return
   }
+  // Aggressive cache-busting so iPhone Safari doesn't pin Roberto to an old
+  // build of the PWA. The icon files (/icon.png, /icon-180.png, /icon-512.png)
+  // get the same treatment — without no-store, iOS would happily serve a
+  // months-old icon for the home-screen shortcut.
   res.writeHead(200, {
     'Content-Type': file.contentType,
-    'Cache-Control': 'no-cache'
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0'
   })
   res.end(file.body)
 }

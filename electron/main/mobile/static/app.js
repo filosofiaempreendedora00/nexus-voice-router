@@ -49,23 +49,36 @@ function setOrbState(state) {
   orb.className = 'orb ' + (micActive ? state : 'muted')
   const label =
     !micActive ? 'mic desligado'
-    : state === 'idle' ? 'aguardando wake word'
+    : state === 'idle' ? 'Aguardando wake word'
     : state === 'hearing' ? 'ouvindo…'
     : state === 'listening' ? 'gravando comando'
     : state === 'thinking' ? 'processando…'
     : state === 'executed' ? 'pronto ✓'
     : state === 'error' ? 'erro'
-    : 'aguardando…'
+    : 'Aguardando…'
   stateLabel.textContent = label
 
-  // Cancel button visibility: only when a prompt is in-flight
-  // (listening = capturing audio, thinking = API call). Thinking gets the
-  // 'urgent' style because that's when each second costs Anthropic tokens.
-  if (micActive && (state === 'listening' || state === 'thinking')) {
+  // Cancel button: visible whenever the mic is ON, regardless of state.
+  // Roberto wants the THIRD option always present alongside "Pausar mic"
+  // and the "ok" voice commit. The cancel discards whatever buffer is
+  // being captured AND aborts any in-flight Anthropic call — mic stays on
+  // so he can immediately try again without re-tapping "Ativar mic".
+  //
+  // Label and urgency vary by state so he can read at a glance what's
+  // about to be tossed:
+  //   - idle / hearing: just "Cancelar áudio" (nothing committed yet,
+  //     button is insurance against accidental wake)
+  //   - listening: "Cancelar prompt" (red, gentle pulse — saves API call)
+  //   - thinking: "Cancelar processamento" (red URGENT — every second
+  //     costs tokens, button glows solid)
+  if (micActive) {
     cancelBtn.classList.remove('hidden')
     cancelBtn.classList.toggle('urgent', state === 'thinking')
-    cancelBtn.querySelector('.cancel-text').textContent =
-      state === 'thinking' ? 'Cancelar processamento' : 'Cancelar prompt'
+    const text =
+      state === 'thinking'  ? 'Cancelar processamento'
+      : state === 'listening' ? 'Cancelar prompt'
+      : 'Cancelar áudio'
+    cancelBtn.querySelector('.cancel-text').textContent = text
   } else {
     cancelBtn.classList.add('hidden')
     cancelBtn.classList.remove('urgent')

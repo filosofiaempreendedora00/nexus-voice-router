@@ -127,33 +127,38 @@ class WakeService extends EventEmitter {
   }
 
   /**
-   * User-initiated cancel — works in two phases:
+   * User-initiated cancel — always available while the mic is on. Behaviour
+   * depends on what's currently happening:
    *
-   * 1. During `listening`: discard the captured buffer, no API call ever
-   *    happens. Free.
-   * 2. During `thinking`: abort the in-flight Anthropic request via
-   *    AbortController. Anthropic stops generating mid-stream; we pay for
-   *    whatever tokens were already produced (usually a small fraction)
-   *    instead of the full response. Practical saving.
+   *   - `listening`: discard the captured buffer. No API call ever happens. $0.
+   *   - `thinking`:  abort the in-flight Anthropic request via AbortController.
+   *                  Anthropic stops generating mid-stream; we pay for whatever
+   *                  was already produced (small fraction) instead of the full
+   *                  response. Practical saving.
+   *   - `hearing`:   just reset to idle. Nothing was committed; this is
+   *                  insurance against an accidental wake about to fire.
+   *   - `idle`:      no-op, but we still emit a status update so the UI can
+   *                  flash "cancelado" briefly — confirms the tap registered.
    *
    * Called from the mobile PWA's cancel button, from IPC for the Mac main
    * window, or from voice via the existing CANCEL_WORDS path.
    */
   cancel(): void {
-    if (this.state === 'idle' || this.state === 'executed' || this.state === 'error') {
-      wakeLog(`[cancel] noop in state=${this.state}`)
-      return
-    }
     wakeLog(`[cancel] state=${this.state} buffer=${JSON.stringify(this.buffer.slice(0, 80))}`)
+    // Always clear scheduled commits and any captured audio buffer.
     this.clearTimer()
     this.buffer = ''
     this.targetChat = undefined
+    // Abort any in-flight Anthropic call. Safe in any state — abort() on a
+    // not-yet-started controller has no effect.
     if (this.currentAbortController) {
       try { this.currentAbortController.abort() } catch { /* */ }
       this.currentAbortController = null
     }
-    // Brief cooldown so a long "Cancelar" tap doesn't immediately re-fire wake.
-    this.cooldownUntil = Date.now() + 1500
+    // Cooldown so a long-press doesn't immediately re-fire wake on the next
+    // audio chunk arriving. Slightly shorter when there was nothing to cancel.
+    const wasActive = this.state === 'listening' || this.state === 'thinking'
+    this.cooldownUntil = Date.now() + (wasActive ? 1500 : 700)
     this.transition('idle', 'cancelado')
   }
 
