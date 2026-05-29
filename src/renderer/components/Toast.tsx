@@ -34,7 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }): JSX.
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 z-50 flex flex-col gap-2 pointer-events-none items-end">
         {items.map((i) => (
           <ToastView key={i.id} item={i} />
         ))}
@@ -51,7 +51,10 @@ function ToastView({ item }: { item: ToastItem }): JSX.Element {
     <div
       className={cn(
         'glass rounded-lg border border-line px-4 py-3 flex items-center gap-3',
-        'shadow-2xl animate-slide-up pointer-events-auto min-w-[260px] max-w-[420px]'
+        'shadow-2xl animate-slide-up pointer-events-auto',
+        // On narrow widths we fill the viewport width; on sm+ the toast
+        // sits in the corner with a min/max so it doesn't stretch absurdly.
+        'w-full sm:w-auto sm:min-w-[260px] sm:max-w-[420px]'
       )}
     >
       <Icon size={16} className={color} />

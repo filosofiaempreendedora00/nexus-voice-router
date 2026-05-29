@@ -112,7 +112,10 @@ function matchNavigation(input: string): Intent {
     return candidateToIntent(top)
   }
 
-  const hasAnyDecentMatch = top.score >= 1.5 || hasNavVerb(input)
+  // Require a meaningful match before treating it as ambiguous-but-resolvable.
+  // A bare nav verb alone (e.g. "abre repetitos") shouldn't latch onto any
+  // candidate — it should be rejected so the user retries.
+  const hasAnyDecentMatch = top.score >= 1.5
   if (!hasAnyDecentMatch) {
     return { kind: 'unknown', reason: 'low confidence' }
   }

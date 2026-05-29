@@ -42,8 +42,12 @@ function Orb({ state, wakeKey }: { state: WakeState; wakeKey: number }): JSX.Ele
       key={isThinking ? `wake-${wakeKey}` : `s-${state}`}
       className={`orb orb-${state}`}
     >
-      {/* Subtle ring while hearing/listening — both look the same to the user */}
-      {(isHearing || isListening) && <div className="ring ring-hearing" />}
+      {/* Hearing: barely-there pulse so the user sees "I'm awake & sensing audio". */}
+      {isHearing && <div className="ring ring-hearing" />}
+      {/* Listening: a visible breathing halo + ring — NEXUS confirmed the wake
+          word and is capturing the command. Clearly distinct from hearing. */}
+      {isListening && <div className="halo halo-wake" />}
+      {isListening && <div className="ring ring-wake" />}
       {/* Thinking gets the dramatic rotating comet ring (commit moment) */}
       {isThinking && <div className="ring ring-listening" />}
       {/* Outer glow halo — only on commit (thinking) and result states */}
@@ -151,17 +155,63 @@ body { background: transparent; margin: 0; }
   to   { opacity: 1; transform: scale(1); }
 }
 
-/* LISTENING — kept visually identical to HEARING so the user sees no premature
-   transformation while they speak. The dramatic visual is reserved for THINKING. */
+/* LISTENING — wake-word confirmed. Clearly different from HEARING so Roberto
+   knows the magic happened (NEXUS recognized "Nexus"/"Octopus claude"/etc.
+   and is now capturing the command). Slightly bigger, visibly purple-tinted
+   core, and a soft breathing halo + outer ring. NOT as dramatic as THINKING:
+   the commit moment should still feel like an escalation, not a downgrade. */
 .orb-listening {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  animation: listenBreatheGentle 2.2s ease-in-out infinite;
 }
 .orb-listening .core {
   background: radial-gradient(circle at 32% 24%,
-    rgba(180, 184, 255, 0.18) 0%,
-    rgba(40, 40, 56, 0.96) 75%);
-  border-color: rgba(124, 127, 246, 0.25);
+    rgba(180, 184, 255, 0.55) 0%,
+    rgba(124, 127, 246, 0.65) 40%,
+    rgba(50, 52, 130, 0.95) 100%);
+  border-color: rgba(180, 184, 255, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(180, 184, 255, 0.3),
+    0 6px 20px -4px rgba(124, 127, 246, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.orb-listening .shine {
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 70%);
+}
+
+@keyframes listenBreatheGentle {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+/* The "wake confirmed" halo — calm pulsing glow around the listening orb. */
+.halo-wake {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 127, 246, 0.32) 0%, rgba(124, 127, 246, 0) 65%);
+  animation: haloBreatheSlow 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ring-wake {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(180, 184, 255, 0.55);
+  animation: ringPulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes haloBreatheSlow {
+  0%, 100% { opacity: 0.6; transform: scale(0.96); }
+  50%      { opacity: 1;   transform: scale(1.04); }
+}
+
+@keyframes ringPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50%      { opacity: 0.85; transform: scale(1.08); }
 }
 
 .halo-listening {

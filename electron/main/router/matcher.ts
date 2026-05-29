@@ -104,7 +104,12 @@ function scoreRoute(route: Route, inputTokens: string[], normalizedInput: string
     total -= unexplained * 2.8
   }
 
-  total += Math.min(route.useCount * 0.04, 0.3)
+  // useCount boost ONLY when there's a real match. Without this guard, a
+  // frequently-used route would score positive on inputs that don't actually
+  // match it at all, and could win navigation_ambiguous auto-pick.
+  if (total > 0.5) {
+    total += Math.min(route.useCount * 0.04, 0.3)
+  }
   return total
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, Mic, Globe, Cpu, Volume2, Radio, Link2, Plus, ArrowUp, ArrowDown, Pencil, Trash2, Check, X, Terminal as TerminalIcon } from 'lucide-react'
+import { Save, Mic, Globe, Cpu, Volume2, Radio, Link2, Plus, ArrowUp, ArrowDown, Pencil, Trash2, Check, X, Terminal as TerminalIcon, KeyRound } from 'lucide-react'
 import type { Settings as SettingsType, BaseUrlEntry } from '@shared/types'
 import { api } from '@/lib/api'
 import { Button } from '@/components/Button'
@@ -32,12 +32,12 @@ export function Settings(): JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="p-6 border-b border-line">
+      <header className="p-4 sm:p-6 border-b border-line">
         <h1 className="text-lg font-semibold text-ink">Configurações</h1>
         <p className="text-xs text-ink-muted">Atalho, voz e comportamento</p>
       </header>
       <div className="flex-1 overflow-y-auto scroll-area">
-        <div className="max-w-2xl mx-auto p-8 flex flex-col gap-8">
+        <div className="max-w-2xl mx-auto p-4 sm:p-8 flex flex-col gap-6 sm:gap-8">
 
           <Group icon={<Mic size={14} />} title="Atalho de fala">
             <Input
@@ -46,6 +46,28 @@ export function Settings(): JSX.Element {
               onChange={(e) => setSettings({ ...settings, hotkey: e.target.value })}
               onBlur={(e) => void update('hotkey', e.target.value)}
               hint='Formato Electron. Ex: "CommandOrControl+Shift+Space"'
+            />
+          </Group>
+
+          <Group icon={<KeyRound size={14} />} title="API Anthropic (agentes)">
+            <Input
+              label="Chave da API"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={settings.anthropicApiKey}
+              onChange={(e) => setSettings({ ...settings, anthropicApiKey: e.target.value })}
+              onBlur={(e) => void update('anthropicApiKey', e.target.value.trim())}
+              placeholder="sk-ant-..."
+              hint="Cole sua chave Anthropic. Fica salva localmente em settings.json (somente no seu Mac). Nunca é enviada pra telemetria."
+            />
+            <Input
+              label="Modelo"
+              value={settings.anthropicModel}
+              onChange={(e) => setSettings({ ...settings, anthropicModel: e.target.value })}
+              onBlur={(e) => void update('anthropicModel', e.target.value.trim())}
+              placeholder="claude-sonnet-4-5-20250929"
+              hint="Modelo Anthropic usado pelos agentes. Mantenha o default a menos que saiba o que faz."
             />
           </Group>
 

@@ -116,24 +116,27 @@ export function Routes(): JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between gap-4 p-6 pb-4">
-        <div>
+      <header className="flex items-start justify-between gap-3 p-4 sm:p-6 pb-4">
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold text-ink">Rotas</h1>
           <p className="text-xs text-ink-muted">
             {routes.length} rotas · {templates.length} template{templates.length !== 1 ? 's' : ''} ·{' '}
-            {totalCombinations(templates).toLocaleString('pt-BR')} combinações cobertas
+            {totalCombinations(templates).toLocaleString('pt-BR')} combinações
           </p>
         </div>
         <Button
           variant="primary"
           size="md"
           onClick={() => (tab === 'routes' ? setCreatingRoute(true) : setCreatingTemplate(true))}
+          className="flex-shrink-0"
         >
-          <Plus size={14} /> {tab === 'routes' ? 'Nova rota' : 'Novo template'}
+          <Plus size={14} />
+          <span className="hidden sm:inline">{tab === 'routes' ? 'Nova rota' : 'Novo template'}</span>
+          <span className="sm:hidden">Nova</span>
         </Button>
       </header>
 
-      <div className="px-6">
+      <div className="px-4 sm:px-6">
         <div className="inline-flex bg-bg-subtle rounded-lg p-1 border border-line">
           <TabButton active={tab === 'routes'} onClick={() => setTab('routes')}>
             Rotas <span className="text-[10px] opacity-60 ml-1">({routes.length})</span>
@@ -144,23 +147,23 @@ export function Routes(): JSX.Element {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-line">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 sm:px-6 py-4 border-b border-line">
+        <div className="relative flex-1 sm:max-w-md">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-dim" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={tab === 'routes' ? 'Buscar por comando, alias ou URL…' : 'Buscar template…'}
+            placeholder={tab === 'routes' ? 'Buscar comando, alias ou URL…' : 'Buscar template…'}
             className="w-full h-9 pl-9 pr-3 rounded-lg bg-bg-elevated border border-line text-sm placeholder:text-ink-dim focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/40"
           />
         </div>
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap overflow-x-auto scroll-area -mx-1 px-1 pb-1 sm:pb-0">
           {categories.map((c) => (
             <button
               key={c}
               onClick={() => setCategory(c)}
               className={
-                'h-8 px-3 rounded-md text-xs font-medium transition-all ' +
+                'h-8 px-3 rounded-md text-xs font-medium transition-all whitespace-nowrap ' +
                 (c === category
                   ? 'bg-accent-subtle text-accent border border-accent/40'
                   : 'text-ink-muted hover:text-ink hover:bg-bg-hover border border-transparent')
@@ -172,7 +175,7 @@ export function Routes(): JSX.Element {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scroll-area p-6">
+      <div className="flex-1 overflow-y-auto scroll-area p-4 sm:p-6">
         {tab === 'routes' ? (
           filteredRoutes.length === 0 ? (
             <Empty message={routes.length === 0 ? 'Nenhuma rota ainda. Crie a primeira.' : 'Nada bate com a busca.'} />

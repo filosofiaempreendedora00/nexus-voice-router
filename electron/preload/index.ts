@@ -45,6 +45,32 @@ const api = {
     const handler = (): void => cb()
     ipcRenderer.on('overlay:show', handler)
     return () => ipcRenderer.removeListener('overlay:show', handler)
+  },
+
+  // ---------- Mobile companion ----------
+  mobileEnable: () => ipcRenderer.invoke('mobile:enable'),
+  mobileDisable: () => ipcRenderer.invoke('mobile:disable'),
+  mobileStatus: () => ipcRenderer.invoke('mobile:status'),
+  onMobileStatus: (cb: (s: unknown) => void) => {
+    const handler = (_: unknown, status: unknown): void => cb(status)
+    ipcRenderer.on('mobile:status', handler)
+    return () => ipcRenderer.removeListener('mobile:status', handler)
+  },
+
+  // ---------- Usage / cost ----------
+  usageList: () => ipcRenderer.invoke('usage:list'),
+  usageSummary: () => ipcRenderer.invoke('usage:summary'),
+
+  // ---------- Agents (NEXUS-managed Claude conversations) ----------
+  agentsList: () => ipcRenderer.invoke('agents:list'),
+  agentsListMessages: (agentId: string) => ipcRenderer.invoke('agents:listMessages', agentId),
+  agentsSend: (agentId: string, text: string) =>
+    ipcRenderer.invoke('agents:send', agentId, text),
+  agentsClear: (agentId: string) => ipcRenderer.invoke('agents:clear', agentId),
+  onAgentReply: (cb: (payload: unknown) => void) => {
+    const handler = (_: unknown, payload: unknown): void => cb(payload)
+    ipcRenderer.on('agents:message', handler)
+    return () => ipcRenderer.removeListener('agents:message', handler)
   }
 }
 

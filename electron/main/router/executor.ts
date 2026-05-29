@@ -9,14 +9,16 @@ import {
 import { appendHistory } from '../store/history'
 import { openUrlInChrome, runChromeShortcut } from '../execution/chrome'
 import { typeIntoClaudeCode, sendEnterInClaudeCode } from '../execution/claude-code'
+import { getAgentByChatTrigger } from '../agents/agent-config'
+import { sendToAgent } from '../agents/agent-claude'
 
 export function classifyOnly(input: string): ClassifyResult {
   const intent = classify(input)
   return { input, normalized: input.trim(), intent }
 }
 
-export async function executeInput(input: string): Promise<ExecuteResult> {
-  const intent = classify(input)
+export async function executeInput(input: string, overrideIntent?: Intent): Promise<ExecuteResult> {
+  const intent = overrideIntent ?? classify(input)
   return runIntent(input, intent)
 }
 
@@ -108,14 +110,54 @@ async function runIntent(input: string, intent: Intent): Promise<ExecuteResult> 
       }
 
       case 'prompt_claude': {
-        await typeIntoClaudeCode(intent.text)
+        // NEW: if the wake's chatTrigger maps to a NEXUS-managed agent, route
+        // to the Anthropic API instead of pasting to the Claude desktop app.
+        // This is the v1 of the "agent-shell" architecture Roberto approved:
+        // each tool gets its own JSONL conversation owned by NEXUS.
+        const agent = intent.targetChat ? getAgentByChatTrigger(intent.targetChat) : undefined
+
+        // Strip an opening "claude " token if the wake forced it (single-word
+        // Claude wake prefixes the buffer). The actual prompt for the agent
+        // is everything after "claude".
+        const cleanText = intent.text.replace(/^(claude|cloud|cl[aá]udi[oa])\s+/i, '').trim()
+
+        if (agent) {
+          const result = await sendToAgent(agent.id, cleanText)
+          if (!result.ok) {
+            appendHistory({
+              input,
+              intent: 'prompt_claude',
+              prompt: cleanText,
+              status: 'failed',
+              errorMessage: result.error
+            })
+            return { ok: false, message: `Falha no agente ${agent.displayName}: ${result.error}` }
+          }
+          appendHistory({
+            input,
+            intent: 'prompt_claude',
+            prompt: cleanText,
+            status: 'executed'
+          })
+          // The HUD shows this briefly; full reply goes to the Chat page.
+          const preview = (result.reply ?? '').slice(0, 80)
+          return {
+            ok: true,
+            message: `${agent.displayName}: ${preview}${(result.reply ?? '').length > 80 ? '…' : ''}`
+          }
+        }
+
+        // Fallback: legacy Claude-desktop paste path (still used when no
+        // matching agent is configured — e.g. ad-hoc Cláudio wake).
+        await typeIntoClaudeCode(intent.text, undefined, intent.targetChat)
         appendHistory({
           input,
           intent: 'prompt_claude',
           prompt: intent.text,
           status: 'executed'
         })
-        return { ok: true, message: 'Prompt enviado ao Claude Code (ainda não confirmado).' }
+        const where = intent.targetChat ? ` → ${intent.targetChat}` : ''
+        return { ok: true, message: `Prompt enviado ao Claude${where}` }
       }
 
       case 'operational': {

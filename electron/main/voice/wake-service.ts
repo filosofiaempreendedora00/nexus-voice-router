@@ -6,6 +6,7 @@ import type { WakeState, WakeStatus } from '@shared/types'
 import { transcribeAudio } from './whisper'
 import { executeInput, executeChoice, classifyOnly } from '../router/executor'
 import { loadSettings } from '../store/settings'
+import { normalize as normalizeInput } from '../router/normalizer'
 
 const LOG_DIR = join(homedir(), 'Library', 'Application Support', 'nexus-voice-router')
 const LOG_FILE = join(LOG_DIR, 'wake.log')
@@ -16,16 +17,70 @@ function wakeLog(line: string): void {
   } catch { /* */ }
 }
 
-// Wake word — only "Nexus" variants. Calling "Claude" directly was disabled
-// because in work contexts people say "claude" naturally in conversation and
-// it would trigger NEXUS by accident. To dictate to Claude, prefix with
-// "Nexus claude ..."
+// Wake word — only "Nexus" variants. Calling "Claude" alone is disabled
+// because in work contexts people say "claude" naturally in conversation.
+// To dictate to Claude, prefix with "Nexus claude ..." OR use a 2-word
+// tool-scoped phrase (below) that's safe-by-being-uncommon.
 const NEXUS_WAKE_VARIANTS = [
   'nexus', 'nexos', 'nexa', 'nexis', 'nexius', 'néxus', 'néxos',
   'next', 'lexus', 'lex'
 ]
 const CLAUDE_WAKE_VARIANTS: string[] = []  // disabled — see comment above
 const ALL_WAKE_VARIANTS = [...NEXUS_WAKE_VARIANTS, ...CLAUDE_WAKE_VARIANTS]
+
+// Multi-word wake phrases that bypass "Nexus" and ALSO specify which Claude
+// desktop chat to switch to before pasting. Each tool maps to one named chat
+// in the Claude sidebar.
+interface MultiWordWake {
+  phrase: string
+  chatName: string
+}
+const EPICTETO_TOOL_WORDS = [
+  'epicteto', 'epictetus', 'epicteta', 'epiteto', 'epicteno',
+  'epiquiteto', 'epiqueto', 'epitato', 'epitécto', 'epitecto',
+  'epicteo', 'epicteu', 'epitetus',
+  // Variants observed in Whisper logs — Whisper struggles with "Epicteto":
+  'fique teto', 'fica teto', 'pique teto', 'pica teto',
+  'fiqueteu', 'fiqueteo', 'fiqueti', 'fica teu', 'fique teu',
+  'que teto', 'que teu', 'queteto', 'quetétu', 'quetétor',
+  'victeto', 'vikteto', 'vicketo', 'vekteto', 'victéto', 'vitecto',
+  'reto', 'epcteto', 'epteto', 'epcheto', 'epicheto',
+  // The leading "eh-" is sometimes dropped or merged into preceding silence:
+  'picteto', 'piqueto', 'pichteto', 'pixteto',
+  // Heavily truncated forms Whisper produces — only safe BECAUSE they're
+  // matched as multi-word phrases (e.g. "pt cloud", "repitei claude"):
+  'pt', 'pet', 'pi',
+  'repitei', 'repité', 'repete', 'repetei', 'repitai', 'repitéu',
+  'repitei tu', 'repete tu', 'repetei tu', 'repité tu',
+  'epitétu', 'epi tetu', 'pite tu', 'pete tu', 'pithéu',
+  'pich teto', 'epi-teto', 'epitéu'
+]
+const OCTOPUS_TOOL_WORDS = [
+  'octopus', 'octopos', 'octopuso', 'octopu', 'optopus',
+  'octapus', 'octapos', 'octuposo'
+]
+const CLAUDE_VARIANT_WORDS = ['claude', 'cloud', 'claudio', 'claudia']
+
+function buildMultiWordWakes(): MultiWordWake[] {
+  const out: MultiWordWake[] = []
+  for (const tool of EPICTETO_TOOL_WORDS) {
+    for (const cv of CLAUDE_VARIANT_WORDS) {
+      out.push({ phrase: `${tool} ${cv}`, chatName: 'OFICIAL - EPICTETO' })
+      out.push({ phrase: `${cv} ${tool}`, chatName: 'OFICIAL - EPICTETO' })
+    }
+  }
+  for (const tool of OCTOPUS_TOOL_WORDS) {
+    for (const cv of CLAUDE_VARIANT_WORDS) {
+      out.push({ phrase: `${tool} ${cv}`, chatName: 'OFICIAL - OCTOPUS' })
+      out.push({ phrase: `${cv} ${tool}`, chatName: 'OFICIAL - OCTOPUS' })
+    }
+  }
+  return out
+}
+const MULTI_WORD_CLAUDE_WAKES: MultiWordWake[] = buildMultiWordWakes()
+
+// Default chat when "Nexus claude" is used (no specific tool target).
+const DEFAULT_NEXUS_CHAT = 'NEXUS Voice Router'
 
 // Commit words = ONLY ones unlikely to appear naturally in mid-sentence speech.
 // Excluded: vai, manda, pronto, beleza, fechou, pode ir, vai la (all too common
@@ -52,6 +107,7 @@ class WakeService extends EventEmitter {
   private timeoutTimer: NodeJS.Timeout | null = null
   private cooldownUntil = 0
   private voiceActive = false
+  private targetChat: string | undefined = undefined
 
   getStatus(): WakeStatus {
     return { state: this.state, buffer: this.buffer }
@@ -110,7 +166,9 @@ class WakeService extends EventEmitter {
       return
     }
 
-    const lower = stripAccents(text.toLowerCase())
+    // Full normalization: lowercase, strip accents, strip punctuation (so
+    // commas between "Octopus, Claude" don't break multi-word wake matching).
+    const lower = normalizeInput(text)
 
     if (this.state === 'idle' || this.state === 'hearing') {
       const found = this.findWakeWord(lower)
@@ -122,10 +180,21 @@ class WakeService extends EventEmitter {
         if (found.isClaude && !CLAUDE_PREFIX_REGEX.test(after)) {
           after = ('claude ' + after).trim()
         }
+        // Remember which Claude chat to switch to (set by multi-word wake).
+        this.targetChat = found.chatName
         this.buffer = after
         this.transition('listening')
+
+        // Commit-on-wake heuristic: if the entire utterance arrived in one
+        // chunk and ends with a commit word ("ok"), submit immediately.
+        // - For ≤2-word remainders: always commit (e.g. "Octopus claude ok").
+        // - For longer remainders: commit only if the chunk is plausibly a
+        //   single human utterance (≤ 14 words). This avoids waiting 8s of
+        //   silence when Roberto says the whole prompt at once, but stays
+        //   defensive against Whisper hallucinating "Ok?" at the tail of
+        //   very long mumbled chunks (where word count would be high).
         const afterWords = after.replace(/[.,;:!?\s-]+$/g, '').split(/\s+/).filter(Boolean)
-        if (afterWords.length > 0 && afterWords.length <= 2) {
+        if (afterWords.length > 0 && afterWords.length <= 14) {
           const stripped = this.stripCommitWord(after)
           if (stripped != null) {
             this.buffer = stripped
@@ -194,7 +263,28 @@ class WakeService extends EventEmitter {
     }
   }
 
-  private findWakeWord(input: string): { start: number; end: number; isClaude: boolean } | null {
+  private findWakeWord(input: string): {
+    start: number; end: number; isClaude: boolean; chatName?: string
+  } | null {
+    // 1) Multi-word phrases first (more specific, less false-positive risk).
+    for (const mw of MULTI_WORD_CLAUDE_WAKES) {
+      const idx = input.indexOf(mw.phrase)
+      if (idx === -1) continue
+      const before = idx === 0 ? ' ' : input[idx - 1]
+      const after = input[idx + mw.phrase.length] ?? ' '
+      if (!/[a-z0-9]/.test(before) && !/[a-z0-9]/.test(after)) {
+        return { start: idx, end: idx + mw.phrase.length, isClaude: true, chatName: mw.chatName }
+      }
+    }
+    // 1b) Fuzzy fallback for agent names — Whisper transcribes "Epicteto" as
+    // arbitrary things ("fiqueteu", "que teto", "victeto", "pt", etc.) so we
+    // search for a token adjacent to a claude-variant word and score it by
+    // edit distance against the canonical agent names. This catches new
+    // mishearings without needing to add a literal variant first.
+    const fuzzyHit = findFuzzyAgentWake(input)
+    if (fuzzyHit) return fuzzyHit
+
+    // 2) Single-word wake variants.
     for (const w of ALL_WAKE_VARIANTS) {
       const idx = input.indexOf(w)
       if (idx === -1) continue
@@ -266,8 +356,9 @@ class WakeService extends EventEmitter {
 
   private async submit(): Promise<void> {
     const command = this.buffer.trim().replace(/^[.,;:!?\s-]+/, '').trim()
+    const targetChat = this.targetChat
     this.clearTimer()
-    console.log('[wake] submitting:', JSON.stringify(command))
+    console.log('[wake] submitting:', JSON.stringify(command), 'targetChat:', targetChat)
     if (!command || command.length < 2) {
       this.afterCooldown()
       return
@@ -275,11 +366,19 @@ class WakeService extends EventEmitter {
     this.transition('thinking')
     try {
       const classified = classifyOnly(command).intent
+      // Inject targetChat into prompt_claude intent so the executor switches chats first.
+      if (classified.kind === 'prompt_claude' && targetChat) {
+        classified.targetChat = targetChat
+      }
+      // For plain "Nexus claude" with no specific tool, default to the NEXUS chat.
+      if (classified.kind === 'prompt_claude' && !classified.targetChat) {
+        classified.targetChat = DEFAULT_NEXUS_CHAT
+      }
       let result
       if (classified.kind === 'navigation_ambiguous' && classified.candidates[0]) {
         result = await executeChoice(command, classified.candidates[0])
       } else {
-        result = await executeInput(command)
+        result = await executeInput(command, classified)
       }
       if (result.ok) {
         this.transition('executed', result.message)
@@ -296,6 +395,7 @@ class WakeService extends EventEmitter {
 
   private afterCooldown(): void {
     this.buffer = ''
+    this.targetChat = undefined
     this.cooldownUntil = Date.now() + 400
     this.transition('idle')
   }
@@ -305,6 +405,95 @@ class WakeService extends EventEmitter {
     this.state = state
     this.emit('status', { state, message, buffer: this.buffer })
   }
+}
+
+/**
+ * Map canonical agent identifiers to their wake-service chat triggers.
+ * Used by the fuzzy fallback when Whisper produces a transcription that
+ * doesn't match any literal variant in EPICTETO_TOOL_WORDS / OCTOPUS_TOOL_WORDS.
+ *
+ * The fuzzy threshold is intentionally generous for short names that Whisper
+ * tends to butcher (Epicteto → "fiqueteu", "que teto", "victeto"…). Octopus
+ * is more stable but we still allow some slack for accents and stress.
+ */
+const AGENT_FUZZY_TARGETS: Array<{ name: string; chatName: string; threshold: number }> = [
+  { name: 'epicteto', chatName: 'OFICIAL - EPICTETO', threshold: 4 },
+  { name: 'octopus',  chatName: 'OFICIAL - OCTOPUS',  threshold: 3 }
+]
+
+const CLAUDE_TOKENS = new Set(['claude', 'cloud', 'claudio', 'claudia', 'claudo', 'cláudio'])
+
+/**
+ * Try to find an agent wake by:
+ *   - locating any claude-variant token in the chunk
+ *   - looking at the 1 or 2 tokens adjacent (before AND after)
+ *   - computing Levenshtein distance vs each canonical agent name
+ *   - accepting the closest match if it's within the agent's threshold
+ *
+ * Returns the same shape as the exact-match path so the caller can treat
+ * both the same way.
+ */
+function findFuzzyAgentWake(
+  input: string
+): { start: number; end: number; isClaude: boolean; chatName: string } | null {
+  const tokens = input.split(/\s+/).filter(Boolean)
+  if (tokens.length < 2) return null
+
+  // Find every claude-ish token position.
+  for (let i = 0; i < tokens.length; i++) {
+    if (!CLAUDE_TOKENS.has(tokens[i])) continue
+
+    // Candidates: 1-gram and 2-gram on either side of the claude token.
+    const candidates: string[] = []
+    if (i - 1 >= 0) candidates.push(tokens[i - 1])
+    if (i - 2 >= 0) candidates.push(`${tokens[i - 2]} ${tokens[i - 1]}`)
+    if (i + 1 < tokens.length) candidates.push(tokens[i + 1])
+    if (i + 2 < tokens.length) candidates.push(`${tokens[i + 1]} ${tokens[i + 2]}`)
+
+    let bestScore = Infinity
+    let bestTarget: typeof AGENT_FUZZY_TARGETS[number] | null = null
+    for (const cand of candidates) {
+      if (cand.length < 2) continue  // single char wouldn't be a real agent name mishearing
+      for (const target of AGENT_FUZZY_TARGETS) {
+        const d = levenshtein(cand, target.name)
+        if (d <= target.threshold && d < bestScore) {
+          bestScore = d
+          bestTarget = target
+        }
+      }
+    }
+    if (bestTarget) {
+      // Approximate match bounds (best-effort — wake-service uses these to
+      // strip the wake prefix from the buffer; an imprecise end is fine).
+      const claudeStart = input.indexOf(tokens[i])
+      return {
+        start: 0,
+        end: claudeStart + tokens[i].length,
+        isClaude: true,
+        chatName: bestTarget.chatName
+      }
+    }
+  }
+  return null
+}
+
+/** Standard iterative Levenshtein distance. Small, no deps. */
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+  const prev = new Array(b.length + 1)
+  const curr = new Array(b.length + 1)
+  for (let j = 0; j <= b.length; j++) prev[j] = j
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = curr[j]
+  }
+  return prev[b.length]
 }
 
 function isWordPresent(input: string, word: string): boolean {

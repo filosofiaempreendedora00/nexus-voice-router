@@ -13,7 +13,7 @@ export function History(): JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="p-6 border-b border-line">
+      <header className="p-4 sm:p-6 border-b border-line">
         <h1 className="text-lg font-semibold text-ink">Histórico</h1>
         <p className="text-xs text-ink-muted">Últimos comandos executados ({entries.length})</p>
       </header>
@@ -45,7 +45,7 @@ function Row({ entry }: { entry: HistoryEntry }): JSX.Element {
     : 'text-ink-dim'
 
   return (
-    <div className="px-6 py-3 flex items-center gap-3 hover:bg-bg-hover">
+    <div className="px-4 sm:px-6 py-3 flex items-center gap-3 hover:bg-bg-hover">
       <Icon size={14} className={color + ' flex-shrink-0'} />
       <div className="flex-1 min-w-0">
         <p className="text-sm text-ink truncate">{entry.input}</p>
@@ -55,11 +55,15 @@ function Row({ entry }: { entry: HistoryEntry }): JSX.Element {
           </p>
         )}
       </div>
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <span className="text-[10px] uppercase tracking-wider text-ink-dim px-1.5 py-0.5 rounded bg-bg-elevated border border-line">
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        {/* Intent chip is the first thing to drop when space is tight */}
+        <span
+          className="hidden md:inline text-[10px] uppercase tracking-wider text-ink-dim px-1.5 py-0.5 rounded bg-bg-elevated border border-line"
+          title={`Intenção: ${entry.intent}`}
+        >
           {entry.intent}
         </span>
-        <span className="text-[11px] text-ink-dim">{formatRelativeTime(entry.at)}</span>
+        <span className="text-[11px] text-ink-dim whitespace-nowrap">{formatRelativeTime(entry.at)}</span>
       </div>
     </div>
   )

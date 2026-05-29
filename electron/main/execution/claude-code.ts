@@ -65,40 +65,57 @@ return frontApp
   return appName
 }
 
-export async function typeIntoClaudeCode(text: string, autoEnter?: boolean): Promise<void> {
-  // 1. Always copy to clipboard (no permission needed).
-  clipboard.writeText(text)
+async function runPasteHelper(actions: string[]): Promise<void> {
+  if (!existsSync(PASTE_HELPER_APP)) {
+    throw new Error('PasteHelper.app not installed at ' + PASTE_HELPER_APP)
+  }
+  const args = ['-a', PASTE_HELPER_APP, '-W', '--args', ...actions]
+  await execFileAsync('/usr/bin/open', args, { timeout: 8000 })
+}
 
-  // 2. Focus target app via Apple Events (different permission than keystroke;
-  //    usually already granted).
+export async function typeIntoClaudeCode(
+  text: string,
+  autoEnter?: boolean,
+  targetChat?: string
+): Promise<void> {
+  // 1. Focus the target Claude app (Apple Events).
   await focusClaudeHost()
 
   const settings = loadSettings()
   const shouldAutoEnter = autoEnter ?? settings.claudeAutoEnter
 
-  // 3. Launch the standalone PasteHelper.app via `open` (LaunchServices) so it
-  //    runs with its OWN TCC identity (the .app's identifier). A direct
-  //    fork+exec from Electron would make NEXUS the "responsible process" and
-  //    macOS would silently block the keystroke because NEXUS isn't in
-  //    Accessibility — even though PasteHelper.app is.
-  if (existsSync(PASTE_HELPER_APP)) {
+  // 2. If a specific chat was requested, switch to it using Claude's chat search.
+  //    Flow: ⌘K opens the recents/search popover → paste chat name → Enter → chat opens.
+  if (targetChat && existsSync(PASTE_HELPER_APP)) {
     try {
-      const args = ['-a', PASTE_HELPER_APP, '-W', '--args']
-      if (shouldAutoEnter) args.push('--enter')
-      await execFileAsync('/usr/bin/open', args, { timeout: 5000 })
-      return
+      clipboard.writeText(targetChat)
+      // cmdk + paste name + enter + wait for chat to load
+      await runPasteHelper(['cmdk', 'sleep', '250', 'paste', 'sleep', '350', 'enter', 'sleep', '700'])
     } catch (err) {
-      console.warn('[claude-code] PasteHelper via `open` failed:', err)
+      console.warn('[claude-code] chat switch failed:', err)
+      // Continue anyway — at worst, prompt goes to current chat.
     }
   }
 
-  // 4. Last resort: clipboard is set, ask user to ⌘V manually.
+  // 3. Put the actual prompt on the clipboard and paste.
+  clipboard.writeText(text)
+
+  if (existsSync(PASTE_HELPER_APP)) {
+    try {
+      const actions = ['paste']
+      if (shouldAutoEnter) actions.push('sleep', '120', 'enter')
+      await runPasteHelper(actions)
+      return
+    } catch (err) {
+      console.warn('[claude-code] paste failed:', err)
+    }
+  }
+
+  // 4. Fallback: clipboard is set, ask user to ⌘V manually.
   new Notification({
     title: 'Prompt copiado',
     body: text.length > 80 ? text.slice(0, 80) + '…' : text,
-    subtitle: existsSync(PASTE_HELPER_BIN)
-      ? 'Conceda Acessibilidade ao PasteHelper (~/.nexus/PasteHelper.app)'
-      : 'PasteHelper não instalado — pressione ⌘V manualmente',
+    subtitle: 'PasteHelper falhou — pressione ⌘V manualmente',
     silent: false
   }).show()
 }

@@ -18,7 +18,11 @@ const DEFAULTS: Settings = {
     { id: 'render', url: 'https://sales-jornada.onrender.com', label: 'Render (Sales Jornada)' }
   ],
   claudeAutoEnter: true,
-  claudeCodeApp: 'Claude'
+  claudeCodeApp: 'Claude',
+  anthropicApiKey: '',
+  anthropicModel: 'claude-sonnet-4-5-20250929',
+  ngrokAuthtoken: '',
+  ngrokStaticDomain: ''
 }
 
 export function loadSettings(): Settings {

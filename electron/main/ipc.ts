@@ -1,6 +1,12 @@
-import { ipcMain, systemPreferences } from 'electron'
+import { ipcMain, systemPreferences, BrowserWindow } from 'electron'
 import { wakeService } from './voice/wake-service'
 import { getHudWindow } from './windows'
+import { AGENTS } from './agents/agent-config'
+import { listMessages, clearConversation } from './agents/agent-storage'
+import { sendToAgent } from './agents/agent-claude'
+import { agentEvents } from './agents/agent-events'
+import { listUsage, summarize } from './agents/usage-store'
+import { mobileService } from './mobile'
 import {
   listRoutes,
   getRoute,
@@ -80,6 +86,37 @@ export function registerIpcHandlers(): void {
     const hud = getHudWindow()
     if (hud && !hud.isDestroyed()) {
       hud.webContents.send('wake:status', status)
+    }
+  })
+
+  // ---------- Mobile companion ----------
+  ipcMain.handle('mobile:enable', async () => await mobileService.enable())
+  ipcMain.handle('mobile:disable', () => mobileService.disable())
+  ipcMain.handle('mobile:status', async () => await mobileService.statusAsync())
+  mobileService.on('status', (status) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('mobile:status', status)
+    }
+  })
+
+  // ---------- Usage / cost ----------
+  ipcMain.handle('usage:list', () => listUsage())
+  ipcMain.handle('usage:summary', () => summarize())
+
+  // ---------- Agents (NEXUS-managed Claude conversations) ----------
+  ipcMain.handle('agents:list', () => AGENTS)
+  ipcMain.handle('agents:listMessages', (_e, agentId: string) => listMessages(agentId))
+  ipcMain.handle('agents:send', (_e, agentId: string, text: string) => sendToAgent(agentId, text))
+  ipcMain.handle('agents:clear', (_e, agentId: string) => {
+    clearConversation(agentId)
+  })
+
+  // Broadcast new agent messages to every renderer window so the Chat page
+  // updates live whether the message originated from voice or from the typed
+  // input in the Chat panel itself.
+  agentEvents.on('message', (evt) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('agents:message', evt)
     }
   })
 }

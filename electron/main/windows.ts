@@ -35,8 +35,11 @@ export function createMainWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 740,
-    minWidth: 880,
-    minHeight: 600,
+    // The renderer is fully responsive down to ~440px, so we set a generous
+    // floor that allows side-by-side experimentation (e.g. NEXUS docked
+    // beside Claude desktop). The renderer adapts via Tailwind breakpoints.
+    minWidth: 480,
+    minHeight: 560,
     show: false,
     title: 'NEXUS Voice Router',
     backgroundColor: '#0A0A0B',
@@ -187,7 +190,10 @@ export function createHudWindow(): BrowserWindow {
   const width = 140
   const height = 140
   const padding = 12
-  const x = display.workArea.x + display.workArea.width - width - padding
+  // Roberto prefers the HUD on the left side of the screen — keeps it out of
+  // the way of the macOS notification center / menu bar status icons that
+  // crowd the right.
+  const x = display.workArea.x + padding
   const y = display.workArea.y + display.workArea.height - height - padding
 
   hudWindow = new BrowserWindow({

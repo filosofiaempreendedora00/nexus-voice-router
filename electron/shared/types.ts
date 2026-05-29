@@ -77,6 +77,110 @@ export interface Settings {
   baseUrls: BaseUrlEntry[]
   claudeAutoEnter: boolean
   claudeCodeApp: string
+  anthropicApiKey: string
+  anthropicModel: string
+  // ngrok stable-URL config — when both are filled, the mobile tunnel uses
+  // ngrok instead of the disposable cloudflared quick tunnel.
+  ngrokAuthtoken: string
+  ngrokStaticDomain: string
+}
+
+// =============== Agents (NEXUS-managed Claude conversations) ===============
+
+export interface AgentConfig {
+  id: string                // e.g. "octopus"
+  displayName: string       // e.g. "Octopus"
+  description: string       // shown in UI
+  chatTrigger: string       // chat name from wake (e.g. "OFICIAL - OCTOPUS")
+  systemPrompt: string
+  color: string             // tailwind color token for badge
+  emoji: string             // visual icon for picker
+}
+
+export interface MessageUsage {
+  inputTokens: number
+  outputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+  usd: number
+  model: string
+}
+
+export interface AgentMessage {
+  role: 'user' | 'assistant'
+  content: string
+  at: string                // ISO timestamp
+  usage?: MessageUsage      // only present on assistant messages
+}
+
+export interface AgentSendResult {
+  ok: boolean
+  agentId: string
+  reply?: string            // assistant text (when ok)
+  usage?: MessageUsage      // populated on success
+  error?: string            // human-readable error (when !ok)
+}
+
+// =============== Mobile companion (PWA on phone) ===============
+
+/** Tailscale Funnel readiness probe — what's missing before Funnel can run. */
+export type TailscaleState =
+  | 'not-installed'    // CLI binary not found on the Mac
+  | 'needs-login'      // Tailscale installed but user hasn't signed in
+  | 'ready'            // Logged in; Funnel may or may not be enabled (try to confirm)
+  | 'unknown'
+
+export interface MobileTunnelStatus {
+  state: 'stopped' | 'starting' | 'running' | 'error'
+  /** Which backend is currently running OR would be picked. */
+  kind: 'tailscale' | 'ngrok' | 'cloudflared' | 'none'
+  url?: string
+  error?: string
+  /** Backend binary is installed for the currently-picked kind. */
+  installed: boolean
+  /** Both ngrokAuthtoken and ngrokStaticDomain are filled in Settings. */
+  ngrokConfigured: boolean
+  /** Detailed Tailscale state, when relevant. */
+  tailscale: TailscaleState
+}
+
+export interface MobileStatus {
+  enabled: boolean
+  port: number
+  lanUrl: string | null
+  tunnel: MobileTunnelStatus
+  connectedClients: number
+}
+
+// =============== Usage / cost dashboard ===============
+
+export interface UsageEntry {
+  at: string                              // ISO timestamp of the API call
+  agentId: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+  usd: number                             // total cost of this single call
+}
+
+export interface UsageBucket {
+  usd: number
+  inputTokens: number
+  outputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+  calls: number
+}
+
+export interface UsageSummary {
+  today: UsageBucket
+  week: UsageBucket
+  month: UsageBucket
+  all: UsageBucket
+  perAgent: Record<string, UsageBucket>
+  perDay: Record<string, UsageBucket>     // key = "YYYY-MM-DD" (local)
 }
 
 export type WakeState = 'idle' | 'hearing' | 'listening' | 'thinking' | 'executed' | 'error'
@@ -119,7 +223,7 @@ export type Intent =
       score: number
     }
   | { kind: 'navigation_ambiguous'; candidates: NavCandidate[] }
-  | { kind: 'prompt_claude'; text: string }
+  | { kind: 'prompt_claude'; text: string; targetChat?: string }
   | { kind: 'operational'; action: OpAction }
   | { kind: 'unknown'; reason: string }
 
@@ -189,6 +293,28 @@ declare global {
       hideOverlay: () => void
       onOverlayShow: (cb: () => void) => () => void
       openMainWindow: () => void
+
+      mobileEnable: () => Promise<MobileStatus>
+      mobileDisable: () => Promise<MobileStatus>
+      mobileStatus: () => Promise<MobileStatus>
+      onMobileStatus: (cb: (s: MobileStatus) => void) => () => void
+
+      usageList: () => Promise<UsageEntry[]>
+      usageSummary: () => Promise<UsageSummary>
+
+      agentsList: () => Promise<AgentConfig[]>
+      agentsListMessages: (agentId: string) => Promise<AgentMessage[]>
+      agentsSend: (agentId: string, text: string) => Promise<AgentSendResult>
+      agentsClear: (agentId: string) => Promise<void>
+      onAgentReply: (
+        cb: (payload: {
+          agentId: string
+          role: 'user' | 'assistant'
+          content: string
+          at: string
+          usage?: MessageUsage
+        }) => void
+      ) => () => void
     }
   }
 }

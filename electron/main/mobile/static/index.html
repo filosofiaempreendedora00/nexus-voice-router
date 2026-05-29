@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NEXUS" />
+  <meta name="theme-color" content="#0A0A0B" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-180.png" />
+  <link rel="icon" type="image/png" href="/icon.png" />
+  <title>NEXUS Mobile</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <img src="/icon.png" alt="NEXUS" class="brand-icon" />
+        <div>
+          <h1>NEXUS</h1>
+          <span class="subtitle">Mobile Companion</span>
+        </div>
+      </div>
+      <span id="conn-status" class="conn-status disconnected">desconectado</span>
+    </header>
+
+    <main>
+      <div class="orb-container">
+        <div id="orb" class="orb idle">
+          <div class="orb-inner"></div>
+          <div class="orb-ring"></div>
+        </div>
+        <p id="state-label" class="state-label">aguardando…</p>
+      </div>
+
+      <div id="buffer" class="buffer hidden"></div>
+
+      <div id="reply-card" class="reply-card hidden">
+        <div class="reply-header">
+          <span id="reply-agent">Octopus</span>
+          <span id="reply-cost" class="reply-cost"></span>
+        </div>
+        <div id="reply-content" class="reply-content"></div>
+      </div>
+    </main>
+
+    <footer>
+      <button id="toggle" class="toggle-btn off">
+        <span class="toggle-text">Ativar mic</span>
+      </button>
+      <p class="hint">
+        Diga <strong>"Nexus, [comando] ok"</strong> ou
+        <strong>"Octopus claude [prompt] ok"</strong>
+      </p>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

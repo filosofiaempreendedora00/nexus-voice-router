@@ -32,25 +32,25 @@ export function Home({ onNavigateToRoutes }: Props): JSX.Element {
   const greeting = hour < 6 ? 'Boa madrugada' : hour < 12 ? 'Bom dia' : hour < 19 ? 'Boa tarde' : 'Boa noite'
 
   return (
-    <div className="flex flex-col gap-8 p-8 max-w-5xl">
+    <div className="flex flex-col gap-6 sm:gap-8 p-4 sm:p-8 max-w-5xl">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ink">{greeting}, Roberto.</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold text-ink">{greeting}, Roberto.</h1>
         <p className="text-sm text-ink-muted">
           {routes.length} rotas cadastradas · {history.length} comandos recentes
         </p>
       </header>
 
-      <section className="card p-6 flex items-center gap-5">
-        <div className="w-12 h-12 rounded-xl bg-accent-subtle border border-accent/30 flex items-center justify-center">
+      <section className="card p-4 sm:p-6 flex items-center gap-3 sm:gap-5">
+        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-accent-subtle border border-accent/30 flex items-center justify-center flex-shrink-0">
           <Mic size={20} className="text-accent" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h2 className="text-sm font-semibold text-ink">Pressione o atalho para falar</h2>
-          <p className="text-xs text-ink-muted mt-0.5">
+          <p className="text-xs text-ink-muted mt-0.5 hidden sm:block">
             O overlay aparece no centro da tela. Funciona em qualquer aplicativo.
           </p>
         </div>
-        <div className="flex gap-1">
+        <div className="hidden sm:flex gap-1 flex-shrink-0">
           <span className="kbd">⌘</span>
           <span className="kbd">⇧</span>
           <span className="kbd">Space</span>
