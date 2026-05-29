@@ -30,6 +30,7 @@ const replyContent = document.getElementById('reply-content')
 const replyCost = document.getElementById('reply-cost')
 const toggleBtn = document.getElementById('toggle')
 const toggleText = toggleBtn.querySelector('.toggle-text')
+const cancelBtn = document.getElementById('cancel-btn')
 
 // ============== State ==============
 let ws = null
@@ -56,6 +57,19 @@ function setOrbState(state) {
     : state === 'error' ? 'erro'
     : 'aguardando…'
   stateLabel.textContent = label
+
+  // Cancel button visibility: only when a prompt is in-flight
+  // (listening = capturing audio, thinking = API call). Thinking gets the
+  // 'urgent' style because that's when each second costs Anthropic tokens.
+  if (micActive && (state === 'listening' || state === 'thinking')) {
+    cancelBtn.classList.remove('hidden')
+    cancelBtn.classList.toggle('urgent', state === 'thinking')
+    cancelBtn.querySelector('.cancel-text').textContent =
+      state === 'thinking' ? 'Cancelar processamento' : 'Cancelar prompt'
+  } else {
+    cancelBtn.classList.add('hidden')
+    cancelBtn.classList.remove('urgent')
+  }
 }
 
 function setBuffer(text) {
@@ -337,6 +351,20 @@ async function toggleMic() {
 }
 
 toggleBtn.addEventListener('click', toggleMic)
+
+cancelBtn.addEventListener('click', () => {
+  // Tell the Mac to stop NOW. The wake-service.cancel() over there will
+  // discard any captured buffer AND abort the in-flight Anthropic API call.
+  send({ type: 'cancel' })
+  // Optimistic UI: hide the button immediately. The real state update will
+  // arrive over WS in a few ms via wakeStatus and confirm the transition.
+  cancelBtn.classList.add('hidden')
+  cancelBtn.classList.remove('urgent')
+  // Light haptic feedback on supported devices (iOS Safari ≥17).
+  if (navigator.vibrate) {
+    try { navigator.vibrate(30) } catch { /* */ }
+  }
+})
 
 // ============== Boot ==============
 setOrbState('idle')

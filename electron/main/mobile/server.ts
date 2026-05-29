@@ -51,10 +51,12 @@ let connectionSeq = 0
 type AudioListener = (audioBase64: string) => void
 type VoiceListener = (kind: 'start' | 'end') => void
 type ConnectListener = (count: number) => void
+type CancelListener = () => void
 
 const audioListeners = new Set<AudioListener>()
 const voiceListeners = new Set<VoiceListener>()
 const connectListeners = new Set<ConnectListener>()
+const cancelListeners = new Set<CancelListener>()
 
 export function onAudio(fn: AudioListener): () => void {
   audioListeners.add(fn)
@@ -67,6 +69,10 @@ export function onVoiceEvent(fn: VoiceListener): () => void {
 export function onConnectionChange(fn: ConnectListener): () => void {
   connectListeners.add(fn)
   return () => connectListeners.delete(fn)
+}
+export function onCancel(fn: CancelListener): () => void {
+  cancelListeners.add(fn)
+  return () => cancelListeners.delete(fn)
 }
 
 export function clientCount(): number {
@@ -198,6 +204,8 @@ function handleWsConnection(ws: WebSocket): void {
       for (const l of voiceListeners) l('start')
     } else if (msg.type === 'voiceEnd') {
       for (const l of voiceListeners) l('end')
+    } else if (msg.type === 'cancel') {
+      for (const l of cancelListeners) l()
     }
   })
 

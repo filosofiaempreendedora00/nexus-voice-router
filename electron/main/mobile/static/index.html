@@ -47,6 +47,17 @@
     </main>
 
     <footer>
+      <!--
+        Cancel button — only visible during 'listening' (capturing prompt)
+        or 'thinking' (API call in flight). Pressing it tells the Mac to
+        wakeService.cancel() which aborts the Anthropic request so we don't
+        get billed for a response we won't see.
+      -->
+      <button id="cancel-btn" class="cancel-btn hidden" aria-label="Cancelar prompt em andamento">
+        <span class="cancel-icon" aria-hidden="true">✕</span>
+        <span class="cancel-text">Cancelar</span>
+      </button>
+
       <button id="toggle" class="toggle-btn off">
         <span class="toggle-text">Ativar mic</span>
       </button>

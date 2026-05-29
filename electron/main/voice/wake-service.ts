@@ -108,6 +108,13 @@ class WakeService extends EventEmitter {
   private cooldownUntil = 0
   private voiceActive = false
   private targetChat: string | undefined = undefined
+  /**
+   * AbortController for the currently in-flight API call (set during the
+   * `thinking` state). When the user cancels, we abort this so the Anthropic
+   * request gets dropped server-side and we don't get billed for output
+   * tokens we'll never see.
+   */
+  private currentAbortController: AbortController | null = null
 
   getStatus(): WakeStatus {
     return { state: this.state, buffer: this.buffer }
@@ -117,6 +124,37 @@ class WakeService extends EventEmitter {
     this.clearTimer()
     this.buffer = ''
     this.transition('idle')
+  }
+
+  /**
+   * User-initiated cancel — works in two phases:
+   *
+   * 1. During `listening`: discard the captured buffer, no API call ever
+   *    happens. Free.
+   * 2. During `thinking`: abort the in-flight Anthropic request via
+   *    AbortController. Anthropic stops generating mid-stream; we pay for
+   *    whatever tokens were already produced (usually a small fraction)
+   *    instead of the full response. Practical saving.
+   *
+   * Called from the mobile PWA's cancel button, from IPC for the Mac main
+   * window, or from voice via the existing CANCEL_WORDS path.
+   */
+  cancel(): void {
+    if (this.state === 'idle' || this.state === 'executed' || this.state === 'error') {
+      wakeLog(`[cancel] noop in state=${this.state}`)
+      return
+    }
+    wakeLog(`[cancel] state=${this.state} buffer=${JSON.stringify(this.buffer.slice(0, 80))}`)
+    this.clearTimer()
+    this.buffer = ''
+    this.targetChat = undefined
+    if (this.currentAbortController) {
+      try { this.currentAbortController.abort() } catch { /* */ }
+      this.currentAbortController = null
+    }
+    // Brief cooldown so a long "Cancelar" tap doesn't immediately re-fire wake.
+    this.cooldownUntil = Date.now() + 1500
+    this.transition('idle', 'cancelado')
   }
 
   onVoiceStart(): void {
@@ -364,6 +402,13 @@ class WakeService extends EventEmitter {
       return
     }
     this.transition('thinking')
+
+    // Fresh AbortController for THIS submission. cancel() will fire its
+    // abort() to drop the in-flight Anthropic call. Tracked on the instance
+    // so external callers (cancel()) can find it.
+    const ac = new AbortController()
+    this.currentAbortController = ac
+
     try {
       const classified = classifyOnly(command).intent
       // Inject targetChat into prompt_claude intent so the executor switches chats first.
@@ -376,10 +421,13 @@ class WakeService extends EventEmitter {
       }
       let result
       if (classified.kind === 'navigation_ambiguous' && classified.candidates[0]) {
-        result = await executeChoice(command, classified.candidates[0])
+        result = await executeChoice(command, classified.candidates[0], ac.signal)
       } else {
-        result = await executeInput(command, classified)
+        result = await executeInput(command, classified, ac.signal)
       }
+      // The signal may have been aborted by cancel() while we were awaiting —
+      // in that case state/UI was already reset and we shouldn't transition.
+      if (ac.signal.aborted) return
       if (result.ok) {
         this.transition('executed', result.message)
         setTimeout(() => this.afterCooldown(), 1200)
@@ -388,8 +436,15 @@ class WakeService extends EventEmitter {
         setTimeout(() => this.afterCooldown(), 1600)
       }
     } catch (err) {
-      this.transition('error', err instanceof Error ? err.message : String(err))
+      // AbortError is the expected error when cancel() fires — don't surface
+      // it as a failure, the cancel path already transitioned to idle.
+      const errMsg = err instanceof Error ? err.message : String(err)
+      if (ac.signal.aborted || /abort/i.test(errMsg)) return
+      this.transition('error', errMsg)
       setTimeout(() => this.afterCooldown(), 1600)
+    } finally {
+      // Don't hold a reference to a controller whose call already completed.
+      if (this.currentAbortController === ac) this.currentAbortController = null
     }
   }
 

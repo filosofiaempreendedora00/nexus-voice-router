@@ -80,6 +80,7 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.on('wake:voiceStart', () => wakeService.onVoiceStart())
   ipcMain.on('wake:voiceEnd', () => wakeService.onVoiceEnd())
+  ipcMain.on('wake:cancel', () => wakeService.cancel())
   ipcMain.handle('wake:getStatus', () => wakeService.getStatus())
 
   wakeService.on('status', (status) => {

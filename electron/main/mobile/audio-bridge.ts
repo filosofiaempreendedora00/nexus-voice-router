@@ -1,5 +1,5 @@
 import { wakeService } from '../voice/wake-service'
-import { onAudio, onVoiceEvent, broadcast } from './server'
+import { onAudio, onVoiceEvent, onCancel, broadcast } from './server'
 import { agentEvents } from '../agents/agent-events'
 import { getAgent } from '../agents/agent-config'
 
@@ -27,6 +27,12 @@ export function bindMobileAudioBridge(): void {
   unbinds.push(onVoiceEvent((kind) => {
     if (kind === 'start') wakeService.onVoiceStart()
     else wakeService.onVoiceEnd()
+  }))
+
+  // 2b. Cancel button on the PWA → wake-service.cancel() which aborts any
+  // in-flight Anthropic call and resets state to idle.
+  unbinds.push(onCancel(() => {
+    wakeService.cancel()
   }))
 
   // 3. Wake status from Mac → broadcast to phones so the phone HUD mirrors.

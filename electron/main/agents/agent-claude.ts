@@ -43,7 +43,11 @@ function getClient(apiKey: string): Anthropic {
  *
  * Never logs the API key. Never includes it in error messages.
  */
-export async function sendToAgent(agentId: string, userText: string): Promise<AgentSendResult> {
+export async function sendToAgent(
+  agentId: string,
+  userText: string,
+  signal?: AbortSignal
+): Promise<AgentSendResult> {
   const agent = getAgent(agentId)
   if (!agent) {
     return { ok: false, agentId, error: `Agente desconhecido: ${agentId}` }
@@ -82,6 +86,10 @@ export async function sendToAgent(agentId: string, userText: string): Promise<Ag
 
   try {
     const anthropic = getClient(apiKey)
+    // Pass the AbortSignal so a user cancel actually cuts the request off
+    // server-side. The Anthropic SDK supports `{ signal }` as a request option
+    // — when fired, the in-flight HTTP call rejects with an AbortError and
+    // we stop being billed for further output tokens.
     const resp = await anthropic.messages.create({
       model,
       max_tokens: MAX_TOKENS,
@@ -96,7 +104,7 @@ export async function sendToAgent(agentId: string, userText: string): Promise<Ag
         }
       ],
       messages: apiMessages
-    })
+    }, { signal })
 
     // Flatten Anthropic's content blocks → plain text. v1 ignores tool_use etc.
     const reply = resp.content
@@ -162,6 +170,11 @@ export async function sendToAgent(agentId: string, userText: string): Promise<Ag
     return { ok: true, agentId, reply, usage }
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err)
+    // Cancel path: surface a clean abort signal instead of a noisy error. The
+    // caller (wake-service) inspects signal.aborted to skip UI transitions.
+    if (signal?.aborted || /abort/i.test(raw)) {
+      return { ok: false, agentId, error: 'cancelado' }
+    }
     // Strip anything that looks like an API key from error surface.
     const safe = raw.replace(/sk-ant-[A-Za-z0-9_-]+/g, 'sk-ant-***')
     console.error('[agent-claude] API error:', safe)

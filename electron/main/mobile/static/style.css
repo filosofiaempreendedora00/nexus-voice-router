@@ -357,6 +357,87 @@ footer {
   transform: scale(0.98);
 }
 
+/* ============ Cancel button ============
+   Visible only during 'listening' / 'thinking' — the danger color makes it
+   stand out so Roberto can find and tap it under stress (e.g. realized he
+   said the wrong prompt mid-recording). Subtle pulsing border keeps it
+   "alive" so it doesn't look like dead chrome. */
+.cancel-btn {
+  appearance: none;
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1.5px solid rgba(239, 68, 68, 0.55);
+  color: #FCA5A5;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  animation: cancelAppear 240ms cubic-bezier(0.16, 1, 0.3, 1),
+             cancelPulse 2.2s ease-in-out 240ms infinite;
+}
+
+.cancel-btn .cancel-icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.25);
+  border: 1px solid rgba(252, 165, 165, 0.6);
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.75);
+  color: #FECACA;
+}
+
+.cancel-btn:active {
+  transform: scale(0.97);
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.cancel-btn.hidden {
+  display: none;
+}
+
+/* While 'thinking', the cancel button gets EVEN MORE attention — solid red,
+   no pulse needed because thinking already feels urgent visually. */
+.cancel-btn.urgent {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.85);
+  color: #FFFFFF;
+  animation: cancelAppear 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cancel-btn.urgent .cancel-icon {
+  background: #EF4444;
+  color: white;
+  border-color: white;
+}
+
+@keyframes cancelAppear {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cancelPulse {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.55); }
+  50%      { border-color: rgba(239, 68, 68, 0.85); }
+}
+
 .hint {
   margin: 0;
   font-size: 11px;

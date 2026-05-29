@@ -31,6 +31,7 @@ const api = {
   wakeChunk: (audioBase64: string) => ipcRenderer.invoke('wake:chunk', audioBase64),
   wakeVoiceStart: () => ipcRenderer.send('wake:voiceStart'),
   wakeVoiceEnd: () => ipcRenderer.send('wake:voiceEnd'),
+  wakeCancel: () => ipcRenderer.send('wake:cancel'),
   getWakeStatus: () => ipcRenderer.invoke('wake:getStatus'),
   onWakeStatus: (cb: (s: unknown) => void) => {
     const handler = (_: unknown, status: unknown): void => cb(status)

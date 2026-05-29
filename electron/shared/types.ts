@@ -287,6 +287,7 @@ declare global {
       wakeChunk: (audioBase64: string) => Promise<void>
       wakeVoiceStart: () => void
       wakeVoiceEnd: () => void
+      wakeCancel: () => void
       onWakeStatus: (cb: (s: WakeStatus) => void) => () => void
       getWakeStatus: () => Promise<WakeStatus>
 

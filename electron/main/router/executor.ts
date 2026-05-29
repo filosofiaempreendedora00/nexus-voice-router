@@ -17,14 +17,19 @@ export function classifyOnly(input: string): ClassifyResult {
   return { input, normalized: input.trim(), intent }
 }
 
-export async function executeInput(input: string, overrideIntent?: Intent): Promise<ExecuteResult> {
+export async function executeInput(
+  input: string,
+  overrideIntent?: Intent,
+  signal?: AbortSignal
+): Promise<ExecuteResult> {
   const intent = overrideIntent ?? classify(input)
-  return runIntent(input, intent)
+  return runIntent(input, intent, signal)
 }
 
 export async function executeChoice(
   input: string,
-  candidate: NavCandidate
+  candidate: NavCandidate,
+  signal?: AbortSignal
 ): Promise<ExecuteResult> {
   if (candidate.kind === 'route') {
     const route = getRoute(candidate.routeId)
@@ -42,7 +47,7 @@ export async function executeChoice(
       routeId: route.id,
       url: route.url,
       score: candidate.score
-    })
+    }, signal)
   }
   const tpl = getTemplate(candidate.templateId)
   if (!tpl) {
@@ -60,10 +65,10 @@ export async function executeChoice(
     url: candidate.url,
     slots: candidate.slots,
     score: candidate.score
-  })
+  }, signal)
 }
 
-async function runIntent(input: string, intent: Intent): Promise<ExecuteResult> {
+async function runIntent(input: string, intent: Intent, signal?: AbortSignal): Promise<ExecuteResult> {
   try {
     switch (intent.kind) {
       case 'navigation': {
@@ -122,7 +127,7 @@ async function runIntent(input: string, intent: Intent): Promise<ExecuteResult> 
         const cleanText = intent.text.replace(/^(claude|cloud|cl[aá]udi[oa])\s+/i, '').trim()
 
         if (agent) {
-          const result = await sendToAgent(agent.id, cleanText)
+          const result = await sendToAgent(agent.id, cleanText, signal)
           if (!result.ok) {
             appendHistory({
               input,
