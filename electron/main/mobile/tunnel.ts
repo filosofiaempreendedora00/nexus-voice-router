@@ -280,6 +280,16 @@ async function startTailscale(port: number): Promise<TunnelStatus> {
   currentError = undefined
   notify()
 
+  // Reset any residual serve config from a previous run. If the last NEXUS
+  // session was killed without a clean shutdown, Tailscale still has the
+  // 443 listener registered — `tailscale funnel <port>` then fails with
+  // "listener already exists for port 443". `funnel reset` clears it cheaply.
+  try {
+    await execFileAsync(bin, ['funnel', 'reset'], { timeout: 4000 })
+  } catch {
+    // Reset failing is fine — it just means there was nothing to reset.
+  }
+
   // Foreground `tailscale funnel <port>` blocks and prints the URL. We keep
   // the process alive for as long as the tunnel is up; killing it tears the
   // funnel down. Output format (from Tailscale source):
