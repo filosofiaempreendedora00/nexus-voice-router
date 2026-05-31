@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Smartphone, Wifi, Globe, CheckCircle2, AlertCircle, Loader2, Copy, ExternalLink, Power, Anchor, Zap, Network, Download } from 'lucide-react'
+import { Smartphone, Wifi, Globe, CheckCircle2, AlertCircle, Loader2, Copy, ExternalLink, Power, Zap, Network, Download } from 'lucide-react'
 import QRCode from 'qrcode'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/components/Toast'
-import type { MobileStatus, Settings } from '@shared/types'
+import type { MobileStatus } from '@shared/types'
 
 /**
  * Mobile companion page.
@@ -21,34 +21,16 @@ import type { MobileStatus, Settings } from '@shared/types'
  */
 export function Mobile(): JSX.Element {
   const [status, setStatus] = useState<MobileStatus | null>(null)
-  const [settings, setSettings] = useState<Settings | null>(null)
   const [qrSvg, setQrSvg] = useState<string>('')
   const [busy, setBusy] = useState(false)
-  const [authtokenDraft, setAuthtokenDraft] = useState('')
-  const [domainDraft, setDomainDraft] = useState('')
   const toast = useToast()
 
   // Load + subscribe to status updates.
   useEffect(() => {
     void api.mobileStatus().then(setStatus)
-    void api.getSettings().then((s) => {
-      setSettings(s)
-      setAuthtokenDraft(s.ngrokAuthtoken ?? '')
-      setDomainDraft(s.ngrokStaticDomain ?? '')
-    })
     const off = api.onMobileStatus(setStatus)
     return off
   }, [])
-
-  async function saveNgrokConfig(): Promise<void> {
-    const next = await api.saveSettings({
-      ngrokAuthtoken: authtokenDraft.trim(),
-      ngrokStaticDomain: domainDraft.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')
-    })
-    setSettings(next)
-    toast.show('success', 'Config ngrok salva — desliga e religa o acesso pra aplicar')
-    void api.mobileStatus().then(setStatus)
-  }
 
   // Regenerate QR whenever the URL changes.
   useEffect(() => {
@@ -146,34 +128,16 @@ export function Mobile(): JSX.Element {
             </button>
           </section>
 
-          {/* Backend preference — force Tailscale or auto-pick */}
-          <TunnelPreferenceCard
-            current={settings?.mobileTunnelPreference ?? 'auto'}
-            onChange={async (pref) => {
-              const next = await api.saveSettings({ mobileTunnelPreference: pref })
-              setSettings(next)
-              toast.show('success', 'Preferência salva — desliga e religa pra aplicar')
-            }}
-            activeKind={status.tunnel.kind}
-          />
-
-          {/* Tailscale Funnel — the preferred stable-URL path. */}
+          {/*
+            Tailscale Funnel is now the ONLY supported backend for Mobile.
+            cloudflared quick was disposable (URL changed every session),
+            ngrok's free tier dropped static domains in 2025 — both became
+            useless for a "save the home-screen shortcut and use it forever"
+            workflow. The UI only shows the Tailscale path.
+          */}
           <TailscaleCard
             tailscale={status.tunnel.tailscale}
             activeKind={status.tunnel.kind}
-          />
-
-          {/* ngrok config — drives URL stability across restarts */}
-          <NgrokConfig
-            currentToken={settings?.ngrokAuthtoken ?? ''}
-            currentDomain={settings?.ngrokStaticDomain ?? ''}
-            tokenDraft={authtokenDraft}
-            setTokenDraft={setAuthtokenDraft}
-            domainDraft={domainDraft}
-            setDomainDraft={setDomainDraft}
-            onSave={() => void saveNgrokConfig()}
-            activeKind={status.tunnel.kind}
-            ngrokConfigured={status.tunnel.ngrokConfigured}
           />
 
           {/* Backend missing warning */}
@@ -206,9 +170,7 @@ export function Mobile(): JSX.Element {
                       <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded-md border border-line bg-bg-elevated text-ink-muted flex items-center gap-1">
                         {status.tunnel.kind === 'tailscale'
                           ? <><Network size={10}/> tailscale</>
-                          : status.tunnel.kind === 'ngrok'
-                            ? <><Anchor size={10}/> ngrok</>
-                            : <><Zap size={10}/> quick</>}
+                          : <><Zap size={10}/> quick</>}
                       </span>
                     )}
                     <TunnelBadge state={status.tunnel.state} />
@@ -330,92 +292,6 @@ function preferredUrl(s: MobileStatus | null): string | null {
   if (!s || !s.enabled) return null
   if (s.tunnel.url) return s.tunnel.url
   return s.lanUrl
-}
-
-/**
- * Backend preference card — locks Roberto in on a specific tunnel choice so
- * timing races between "Mac just woke up" and "Tailscale daemon ready" stop
- * silently falling back to cloudflared. When "Forçar Tailscale" is picked,
- * the tunnel manager retries the Tailscale probe up to 6 times before
- * giving up.
- */
-function TunnelPreferenceCard({
-  current,
-  onChange,
-  activeKind
-}: {
-  current: 'auto' | 'tailscale' | 'cloudflared' | 'ngrok'
-  onChange: (pref: 'auto' | 'tailscale' | 'cloudflared' | 'ngrok') => void
-  activeKind: MobileStatus['tunnel']['kind']
-}): JSX.Element {
-  const options: { value: typeof current; label: string; hint: string }[] = [
-    {
-      value: 'auto',
-      label: 'Auto',
-      hint: 'Tenta Tailscale, depois ngrok, depois cloudflared. Retry curto.'
-    },
-    {
-      value: 'tailscale',
-      label: 'Forçar Tailscale',
-      hint: 'URL fixa pra sempre. Retry agressivo (6 tentativas em 6s).'
-    },
-    {
-      value: 'cloudflared',
-      label: 'Cloudflared (URL descartável)',
-      hint: 'URL muda toda sessão. Funciona sem setup nenhum.'
-    }
-  ]
-
-  return (
-    <section className="card p-4 sm:p-5 flex flex-col gap-3">
-      <div>
-        <h2 className="text-sm font-semibold text-ink">Preferência de backend</h2>
-        <p className="text-xs text-ink-muted">
-          Qual túnel o NEXUS deve usar quando você liga o Mobile.
-        </p>
-      </div>
-      <div className="flex flex-col gap-2">
-        {options.map((opt) => {
-          const isSelected = current === opt.value
-          const isLive = activeKind === opt.value
-          return (
-            <button
-              key={opt.value}
-              onClick={() => !isSelected && onChange(opt.value)}
-              className={cn(
-                'text-left p-3 rounded-lg border transition-all',
-                isSelected
-                  ? 'border-accent/50 bg-accent-subtle/40'
-                  : 'border-line bg-bg-elevated hover:bg-bg-hover hover:border-line-strong'
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className={cn('text-sm font-medium', isSelected ? 'text-ink' : 'text-ink-muted')}>
-                  {opt.label}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {isLive && (
-                    <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-success/15 text-success">
-                      Em uso
-                    </span>
-                  )}
-                  {isSelected && !isLive && (
-                    <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-accent-subtle text-accent">
-                      Selecionado
-                    </span>
-                  )}
-                </div>
-              </div>
-              <p className="text-[11px] text-ink-dim mt-0.5">{opt.hint}</p>
-            </button>
-          )
-        })}
-      </div>
-      <p className="text-[10px] text-ink-dim leading-relaxed">
-        Mudança aplica na próxima vez que você ligar o Mobile (Desligar → Ligar).
-      </p>
-    </section>
-  )
 }
 
 /**
@@ -581,179 +457,6 @@ function TunnelBadge({ state }: { state: MobileStatus['tunnel']['state'] }): JSX
     <span className={cn('text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded-md border', cfg.cls)}>
       {cfg.label}
     </span>
-  )
-}
-
-/**
- * Setup section for ngrok-backed stable URLs. When both authtoken AND static
- * domain are filled and saved, the tunnel manager swaps from cloudflared
- * quick-tunnel (disposable URLs) to ngrok (one URL forever — survives reboots,
- * survives NEXUS restarts, the iPhone home-screen shortcut keeps working).
- */
-function NgrokConfig({
-  currentToken,
-  currentDomain,
-  tokenDraft,
-  setTokenDraft,
-  domainDraft,
-  setDomainDraft,
-  onSave,
-  activeKind,
-  ngrokConfigured
-}: {
-  currentToken: string
-  currentDomain: string
-  tokenDraft: string
-  setTokenDraft: (v: string) => void
-  domainDraft: string
-  setDomainDraft: (v: string) => void
-  onSave: () => void
-  activeKind: MobileStatus['tunnel']['kind']
-  ngrokConfigured: boolean
-}): JSX.Element {
-  const isDirty = tokenDraft !== currentToken || domainDraft !== currentDomain
-  const isCurrentlyUsing = activeKind === 'ngrok'
-
-  return (
-    <section className="card p-4 sm:p-5 flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 min-w-0">
-          <div
-            className={cn(
-              'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
-              ngrokConfigured ? 'bg-accent/15 text-accent border border-accent/40' : 'bg-bg-hover text-ink-dim border border-line'
-            )}
-          >
-            <Anchor size={16} />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-ink flex items-center gap-2">
-              URL fixa via ngrok
-              {ngrokConfigured && (
-                <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-accent-subtle text-accent">
-                  Configurado
-                </span>
-              )}
-            </h2>
-            <p className="text-xs text-ink-muted">
-              {isCurrentlyUsing
-                ? '✓ Ativo. Seu URL é estável a cada reinício.'
-                : ngrokConfigured
-                  ? 'Configurado, mas o túnel atual ainda é o quick (cloudflared). Reinicie o acesso pra trocar.'
-                  : 'Sem isso, cada sessão gera um URL novo e descartável. O atalho do iPhone quebra.'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {!ngrokConfigured && (
-        <div className="text-xs text-ink-muted flex flex-col gap-2 bg-bg-subtle/40 rounded-md p-3 border border-line">
-          <p className="font-medium text-ink">Setup ngrok em 3 passos (~5 min, 1x só):</p>
-          <ol className="flex flex-col gap-1.5 pl-1">
-            <li className="flex gap-2">
-              <span className="text-ink-dim">1.</span>
-              <span>
-                Crie uma conta grátis em{' '}
-                <a
-                  href="https://dashboard.ngrok.com/signup"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent hover:underline inline-flex items-center gap-0.5"
-                >
-                  dashboard.ngrok.com/signup
-                  <ExternalLink size={10} />
-                </a>{' '}
-                (email é o suficiente)
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="text-ink-dim">2.</span>
-              <span>
-                Copie seu authtoken em{' '}
-                <a
-                  href="https://dashboard.ngrok.com/get-started/your-authtoken"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent hover:underline inline-flex items-center gap-0.5"
-                >
-                  Your Authtoken
-                  <ExternalLink size={10} />
-                </a>{' '}
-                e cole abaixo
-              </span>
-            </li>
-            <li className="flex gap-2">
-              <span className="text-ink-dim">3.</span>
-              <span>
-                Reivindique seu domínio grátis em{' '}
-                <a
-                  href="https://dashboard.ngrok.com/domains"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent hover:underline inline-flex items-center gap-0.5"
-                >
-                  Domains
-                  <ExternalLink size={10} />
-                </a>{' '}
-                (botão "+ New Domain"), pode pegar algo tipo <span className="font-mono">nexus-roberto.ngrok-free.app</span>
-              </span>
-            </li>
-          </ol>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] uppercase tracking-wider font-semibold text-ink-muted">
-            Authtoken
-          </label>
-          <input
-            type="password"
-            value={tokenDraft}
-            onChange={(e) => setTokenDraft(e.target.value)}
-            placeholder="2abc..."
-            autoComplete="off"
-            spellCheck={false}
-            className="h-10 px-3 rounded-lg bg-bg-elevated border border-line text-sm text-ink placeholder:text-ink-dim font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] uppercase tracking-wider font-semibold text-ink-muted">
-            Domínio estático
-          </label>
-          <input
-            value={domainDraft}
-            onChange={(e) => setDomainDraft(e.target.value)}
-            placeholder="nexus-roberto.ngrok-free.app"
-            autoComplete="off"
-            spellCheck={false}
-            className="h-10 px-3 rounded-lg bg-bg-elevated border border-line text-sm text-ink placeholder:text-ink-dim font-mono focus:outline-none focus:ring-2 focus:ring-accent/40"
-          />
-          <p className="text-[11px] text-ink-dim">
-            Sem o "https://" — só o subdomínio. Ex: <span className="font-mono">nexus-roberto.ngrok-free.app</span>
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 self-end">
-          {isDirty && (
-            <span className="text-[11px] text-warning">não salvo</span>
-          )}
-          <button
-            onClick={onSave}
-            disabled={!isDirty}
-            className={cn(
-              'h-9 px-4 rounded-lg text-sm font-medium transition-all',
-              isDirty
-                ? 'bg-accent text-white hover:bg-accent-hover'
-                : 'bg-bg-elevated text-ink-dim border border-line cursor-not-allowed'
-            )}
-          >
-            Salvar config
-          </button>
-        </div>
-      </div>
-    </section>
   )
 }
 

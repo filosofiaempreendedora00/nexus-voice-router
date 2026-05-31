@@ -23,12 +23,23 @@ const DEFAULTS: Settings = {
   anthropicModel: 'claude-sonnet-4-5-20250929',
   ngrokAuthtoken: '',
   ngrokStaticDomain: '',
-  mobileTunnelPreference: 'auto'
+  // Tailscale is the only sane backend now: cloudflared is disposable and
+  // ngrok's free tier no longer offers static domains. Defaulting to
+  // 'tailscale' means new installs go straight to a stable URL, and the
+  // tunnel manager retries hard before giving up.
+  mobileTunnelPreference: 'tailscale'
 }
 
 export function loadSettings(): Settings {
   const s = readJson<Settings>(settingsPath(), DEFAULTS)
-  return { ...DEFAULTS, ...s }
+  const merged = { ...DEFAULTS, ...s }
+  // Migration: cloudflared quick tunnel + ngrok free tier are deprecated for
+  // the mobile use case. Anything that landed on 'auto' is auto-upgraded to
+  // 'tailscale' so post-sleep races stop silently downgrading to a disposable URL.
+  if (merged.mobileTunnelPreference === ('auto' as Settings['mobileTunnelPreference'])) {
+    merged.mobileTunnelPreference = 'tailscale'
+  }
+  return merged
 }
 
 export function saveSettings(patch: Partial<Settings>): Settings {

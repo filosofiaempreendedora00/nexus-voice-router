@@ -173,10 +173,14 @@ async function chooseBackend(): Promise<'tailscale' | 'ngrok' | 'cloudflared'> {
   if (pref === 'tailscale') {
     const ok = await probeTailscaleWithRetry(6)
     if (ok) return 'tailscale'
-    console.warn('[tunnel] preference is tailscale but probe failed 6x; falling back to cloudflared')
-    return 'cloudflared'
+    // NEW behavior: do NOT silently fall back. Return 'tailscale' anyway and
+    // let the startTailscale() error path surface a clear message in the UI.
+    // Roberto explicitly asked for this — a disposable cloudflared URL when
+    // he'd configured a stable Tailscale one is worse than an error he can fix.
+    console.warn('[tunnel] preference=tailscale; probe failed 6x — keeping tailscale and surfacing error')
+    return 'tailscale'
   }
-  // 'auto'
+  // 'auto' (legacy / first-launch on fresh install before settings migrate)
   if (await probeTailscaleWithRetry(3)) return 'tailscale'
   if (isNgrokConfigured() && (await findNgrok())) return 'ngrok'
   return 'cloudflared'
