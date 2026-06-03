@@ -1,6 +1,7 @@
-/* NEXUS Mobile PWA — chat-first layout mirroring the desktop Chat tab.
-   Agent tabs at top, conversation in the middle, voice/text composer at
-   the bottom. Pure dark theme, touch-friendly hit targets, iOS safe areas. */
+/* NEXUS Mobile PWA — chat-first layout with THUMB-FRIENDLY bottom nav.
+   Header / conversation / state row / composer / bottom agent tabs.
+   The bottom tabs are big touch targets (Instagram-style) so Roberto can
+   switch agents with his thumb without reaching for the top of the screen. */
 
 :root {
   --bg: #0A0A0B;
@@ -34,10 +35,7 @@ html, body {
   overscroll-behavior: none;
 }
 
-body {
-  display: flex;
-  flex-direction: column;
-}
+body { display: flex; flex-direction: column; }
 
 .app {
   display: flex;
@@ -45,13 +43,12 @@ body {
   height: 100vh;
   height: 100dvh;
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
   overflow: hidden;
 }
 
-/* ============ Header ============ */
+/* ============ Header — compact, agent context up top so user knows where they are ============ */
 header {
   display: flex;
   align-items: center;
@@ -59,121 +56,68 @@ header {
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
+  gap: 10px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   user-select: none;
+  min-width: 0;
+  flex: 1;
 }
 
 .brand-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   display: block;
+  flex-shrink: 0;
 }
 
-.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
-.brand-text h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.01em; }
-.brand-text .subtitle {
-  font-size: 9px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+.header-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+  flex: 1;
+}
+.header-agent-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.header-agent-hint {
+  font-size: 11px;
   color: var(--ink-dim);
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .conn-status {
   font-size: 10px;
-  padding: 3px 7px;
+  padding: 3px 8px;
   border-radius: 999px;
   font-weight: 600;
   border: 1px solid var(--line);
   letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 .conn-status.connected   { color: var(--success); border-color: rgba(34,197,94,.4); background: rgba(34,197,94,.1); }
 .conn-status.connecting  { color: var(--warning); border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.1); }
 .conn-status.disconnected{ color: var(--ink-dim); }
 
-/* ============ Agent tabs ============ */
-.agent-tabs {
-  display: flex;
-  gap: 6px;
-  padding: 8px 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  border-bottom: 1px solid var(--line);
-  flex-shrink: 0;
-  background: var(--bg-subtle);
-}
-.agent-tabs::-webkit-scrollbar { display: none; }
-
-.agent-tab {
-  appearance: none;
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--ink-muted);
-  padding: 7px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.15s;
-  position: relative;
-}
-.agent-tab .tab-emoji { font-size: 15px; line-height: 1; }
-.agent-tab .tab-unread {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--accent);
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  margin-left: 2px;
-}
-.agent-tab.active {
-  background: var(--bg-elevated);
-  border-color: rgba(99,102,241,.45);
-  color: var(--ink);
-  box-shadow: 0 1px 4px rgba(0,0,0,.2);
-}
-.agent-tab:active { transform: scale(0.97); }
-
-.agent-hint {
-  margin: 0;
-  padding: 6px 14px 4px;
-  font-size: 11px;
-  color: var(--ink-dim);
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-subtle);
-}
-.agent-hint code {
-  font-family: ui-monospace, monospace;
-  font-size: 10.5px;
-  color: var(--ink-muted);
-  background: var(--bg-elevated);
-  padding: 1px 5px;
-  border-radius: 4px;
-  border: 1px solid var(--line);
-}
-
 /* ============ Message list ============ */
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 12px 4px;
+  padding: 14px 12px 6px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -188,15 +132,15 @@ header {
 .message.user { flex-direction: row-reverse; }
 
 .message-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   background: var(--bg-elevated);
   border: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 15px;
   flex-shrink: 0;
 }
 .message.user .message-avatar {
@@ -208,8 +152,8 @@ header {
 .message-body {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  max-width: calc(100% - 38px);
+  gap: 4px;
+  max-width: calc(100% - 40px);
   align-items: flex-start;
 }
 .message.user .message-body { align-items: flex-end; }
@@ -217,8 +161,8 @@ header {
 .message-bubble {
   background: var(--bg-elevated);
   border: 1px solid var(--line);
-  border-radius: 14px 14px 14px 4px;
-  padding: 10px 13px;
+  border-radius: 16px 16px 16px 4px;
+  padding: 11px 14px;
   font-size: 14.5px;
   line-height: 1.5;
   word-wrap: break-word;
@@ -229,10 +173,9 @@ header {
   background: var(--accent);
   color: white;
   border-color: var(--accent);
-  border-radius: 14px 14px 4px 14px;
+  border-radius: 16px 16px 4px 16px;
 }
 
-/* Light markdown rendering inside assistant bubbles */
 .message-bubble strong { font-weight: 600; }
 .message-bubble em { font-style: italic; }
 .message-bubble code {
@@ -252,18 +195,21 @@ header {
   font-size: 12.5px;
   margin: 6px 0;
 }
-.message-bubble pre code {
-  background: transparent;
-  border: none;
-  padding: 0;
-  font-size: 12.5px;
-}
-.message-bubble ul, .message-bubble ol {
-  margin: 6px 0;
-  padding-left: 22px;
-}
+.message-bubble pre code { background: transparent; border: none; padding: 0; font-size: 12.5px; }
+.message-bubble ul, .message-bubble ol { margin: 6px 0; padding-left: 22px; }
 .message-bubble li { margin: 2px 0; }
 .message-bubble a { color: var(--accent-bright); text-decoration: underline; }
+.message-bubble h3, .message-bubble h4, .message-bubble h5 {
+  margin: 8px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.message-bubble blockquote {
+  margin: 6px 0;
+  padding: 2px 10px;
+  border-left: 3px solid var(--line);
+  color: var(--ink-muted);
+}
 
 .message-meta {
   display: flex;
@@ -283,34 +229,36 @@ header {
 
 /* ============ Empty state ============ */
 .empty-state {
-  flex: 1;
+  margin: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
-  padding: 40px 20px;
+  padding: 30px 20px;
   color: var(--ink-dim);
-  gap: 10px;
+  gap: 12px;
 }
 .empty-state.hidden { display: none; }
 .empty-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 54px;
+  height: 54px;
+  border-radius: 15px;
   background: var(--bg-elevated);
   border: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  color: var(--ink-muted);
+  font-size: 26px;
 }
-.empty-title { margin: 0; font-size: 14px; color: var(--ink-muted); }
-.empty-hint { margin: 0; font-size: 12px; }
-.empty-hint code, .empty-hint #empty-wake {
+.empty-title { margin: 0; font-size: 14px; color: var(--ink-muted); font-weight: 500; }
+.empty-hint { margin: 0; font-size: 12px; line-height: 1.5; }
+.empty-hint code {
   font-family: ui-monospace, monospace;
   color: var(--ink-muted);
+  background: var(--bg-elevated);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
 }
 
 /* ============ State row (orb + label) ============ */
@@ -404,21 +352,10 @@ header {
   font-family: ui-monospace, monospace;
 }
 
-/* ============ Footer (composer) ============ */
-footer {
-  padding: 8px 12px 12px;
-  border-top: 1px solid var(--line);
-  background: var(--bg);
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Cancel button — only visible during listening / thinking. */
+/* ============ Cancel button — only visible during listening / thinking ============ */
 .cancel-btn {
+  margin: 8px 12px 0;
   appearance: none;
-  width: 100%;
   height: 44px;
   border-radius: 12px;
   background: rgba(239,68,68,.14);
@@ -433,6 +370,7 @@ footer {
   gap: 8px;
   animation: cancelAppear 200ms ease-out,
              cancelPulse 2.2s ease-in-out 200ms infinite;
+  flex-shrink: 0;
 }
 .cancel-btn .cancel-icon {
   display: inline-flex;
@@ -458,6 +396,17 @@ footer {
 @keyframes cancelAppear { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 @keyframes cancelPulse { 0%,100%{border-color:rgba(239,68,68,.55)} 50%{border-color:rgba(239,68,68,.85)} }
 
+/* ============ Composer ============ */
+.composer {
+  padding: 8px 12px 8px;
+  background: var(--bg);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+}
+
 .input-row {
   display: flex;
   gap: 8px;
@@ -473,7 +422,7 @@ footer {
   font-family: inherit;
   font-size: 15px;
   line-height: 1.4;
-  padding: 10px 12px;
+  padding: 11px 14px;
   resize: none;
   max-height: 120px;
   outline: none;
@@ -484,8 +433,8 @@ footer {
 
 .send-btn {
   appearance: none;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 12px;
   background: var(--accent);
   color: white;
@@ -509,7 +458,7 @@ footer {
   appearance: none;
   border: 1px solid var(--line);
   width: 100%;
-  height: 44px;
+  height: 42px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
@@ -528,7 +477,91 @@ footer {
 }
 .toggle-btn:active { transform: scale(0.98); }
 
-/* ============ Banners ============ */
+/* ============ Agent tabs — THUMB-FRIENDLY BOTTOM NAV ============
+   Big touch targets, vertical stack (emoji on top, name below). Active tab
+   gets purple highlight + bottom indicator strip. Mirrors iOS tab bars
+   like Instagram / WhatsApp. The whole row lives BELOW the composer so
+   it sits right where the thumb naturally rests. */
+.agent-tabs {
+  display: flex;
+  background: var(--bg-subtle);
+  border-top: 1px solid var(--line);
+  /* Pad bottom for iPhone home-indicator safe area */
+  padding-bottom: env(safe-area-inset-bottom);
+  flex-shrink: 0;
+}
+
+.agent-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  flex: 1;
+  /* Tall enough for comfortable thumb tap — Apple's HIG min is 44pt, we
+     give 62px including label so the whole stack is easy to hit. */
+  min-height: 62px;
+  padding: 8px 4px 10px;
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+  transition: color 0.15s, background 0.15s;
+}
+
+.agent-tab .tab-emoji {
+  font-size: 24px;
+  line-height: 1;
+  display: block;
+  position: relative;
+}
+
+.agent-tab .tab-name {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+/* Unread badge — small red dot in the top-right of the emoji */
+.agent-tab .tab-unread {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--danger);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-subtle);
+}
+
+/* Active tab — purple text + bottom indicator strip */
+.agent-tab.active {
+  color: var(--accent-bright);
+}
+.agent-tab.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 0 0 4px 4px;
+}
+
+.agent-tab:active { background: var(--bg-hover); }
+
+/* ============ Banner ============ */
 .error-banner {
   margin: 8px 12px;
   padding: 10px 12px;
