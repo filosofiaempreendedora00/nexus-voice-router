@@ -15,6 +15,7 @@ import {
 } from './tunnel'
 import { bindMobileAudioBridge, unbindMobileAudioBridge } from './audio-bridge'
 import { findLanIp } from './ip'
+import { loadSettings, saveSettings } from '../store/settings'
 
 /**
  * Single entrypoint for the Mobile feature. The UI (Mac renderer) just calls
@@ -64,11 +65,14 @@ class MobileService extends EventEmitter {
     })
   }
 
-  async enable(): Promise<MobileStatus> {
+  async enable(opts?: { persist?: boolean }): Promise<MobileStatus> {
     if (this.enabled) return this.status()
     startServer()
     bindMobileAudioBridge()
     this.enabled = true
+    // Remember this choice so the next NEXUS launch auto-re-enables Mobile.
+    // The iPhone home-screen shortcut keeps working through app restarts.
+    if (opts?.persist !== false) saveSettings({ mobileEnabled: true })
     this.emitStatus()
     // Fire-and-forget the tunnel — UI will receive an update via onTunnelStatus.
     void startTunnel(PORT_FALLBACK).catch((err) => {
@@ -77,14 +81,29 @@ class MobileService extends EventEmitter {
     return this.status()
   }
 
-  disable(): MobileStatus {
+  disable(opts?: { persist?: boolean }): MobileStatus {
     if (!this.enabled) return this.status()
     stopTunnel()
     unbindMobileAudioBridge()
     stopServer()
     this.enabled = false
+    if (opts?.persist !== false) saveSettings({ mobileEnabled: false })
     this.emitStatus()
     return this.status()
+  }
+
+  /**
+   * Called once on app boot. Honors the saved `mobileEnabled` flag and
+   * auto-re-enables Mobile if it was on in the previous session. Roberto
+   * gets the stable URL working again without having to find and click
+   * the "Ligar" button after every NEXUS restart.
+   */
+  async maybeAutoStart(): Promise<void> {
+    const s = loadSettings()
+    if (s.mobileEnabled) {
+      console.log('[mobile] auto-restarting (was enabled last session)')
+      await this.enable({ persist: false })
+    }
   }
 
   status(): MobileStatus {

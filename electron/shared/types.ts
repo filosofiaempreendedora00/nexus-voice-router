@@ -94,6 +94,13 @@ export interface Settings {
    *   - 'ngrok': use ngrok with the configured authtoken+domain.
    */
   mobileTunnelPreference: 'auto' | 'tailscale' | 'cloudflared' | 'ngrok'
+  /**
+   * Remember whether the Mobile feature was active in the last session.
+   * NEXUS auto-re-enables it on launch if true — Roberto doesn't have to
+   * click "Ligar" every time the app restarts (which previously broke the
+   * iPhone home-screen shortcut even though the URL itself was stable).
+   */
+  mobileEnabled: boolean
 }
 
 // =============== Agents (NEXUS-managed Claude conversations) ===============

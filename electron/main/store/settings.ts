@@ -27,7 +27,11 @@ const DEFAULTS: Settings = {
   // ngrok's free tier no longer offers static domains. Defaulting to
   // 'tailscale' means new installs go straight to a stable URL, and the
   // tunnel manager retries hard before giving up.
-  mobileTunnelPreference: 'tailscale'
+  mobileTunnelPreference: 'tailscale',
+  // First-time launch defaults Mobile off — user enables it from the UI.
+  // Subsequent launches use whatever was last saved so the iPhone shortcut
+  // keeps working through NEXUS restarts.
+  mobileEnabled: false
 }
 
 export function loadSettings(): Settings {

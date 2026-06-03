@@ -97,6 +97,17 @@ if (!ensureSingleInstance()) {
       createHudWindow()
     }
 
+    // Auto-restart the Mobile feature if it was on in the previous session.
+    // The iPhone home-screen shortcut survives across NEXUS restarts now —
+    // no more "page can't be loaded" surprises when the tunnel had silently
+    // gone away with the previous app process.
+    try {
+      const { mobileService } = await import('./mobile')
+      await mobileService.maybeAutoStart()
+    } catch (err) {
+      console.error('[mobile] auto-start failed:', err)
+    }
+
     app.on('activate', () => {
       const visibleMain = BrowserWindow.getAllWindows().find(
         (w) => !w.isDestroyed() && w.isVisible() && !w.isAlwaysOnTop()
