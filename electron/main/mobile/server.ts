@@ -10,6 +10,8 @@ import styleCss from './static/style.css?raw'
 import manifestJson from './static/manifest.json?raw'
 import { ICON_PNG_BASE64 } from './static/icon-png'
 import { ICON_SQUARE_180_BASE64, ICON_SQUARE_512_BASE64 } from './static/icon-png-square'
+import { AGENTS } from '../agents/agent-config'
+import { listMessages } from '../agents/agent-storage'
 
 const PORT = 47823
 
@@ -68,11 +70,13 @@ type AudioListener = (audioBase64: string) => void
 type VoiceListener = (kind: 'start' | 'end') => void
 type ConnectListener = (count: number) => void
 type CancelListener = () => void
+type SendTextListener = (agentId: string, text: string) => void
 
 const audioListeners = new Set<AudioListener>()
 const voiceListeners = new Set<VoiceListener>()
 const connectListeners = new Set<ConnectListener>()
 const cancelListeners = new Set<CancelListener>()
+const sendTextListeners = new Set<SendTextListener>()
 
 export function onAudio(fn: AudioListener): () => void {
   audioListeners.add(fn)
@@ -89,6 +93,10 @@ export function onConnectionChange(fn: ConnectListener): () => void {
 export function onCancel(fn: CancelListener): () => void {
   cancelListeners.add(fn)
   return () => cancelListeners.delete(fn)
+}
+export function onSendText(fn: SendTextListener): () => void {
+  sendTextListeners.add(fn)
+  return () => sendTextListeners.delete(fn)
 }
 
 export function clientCount(): number {
@@ -171,6 +179,43 @@ function handleHttp(req: IncomingMessage, res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*')
 
   const url = (req.url ?? '/').split('?')[0]
+
+  // ---------- JSON API ----------
+  // GET /api/agents → list of agents (id, displayName, emoji, color, etc.)
+  // GET /api/agents/:id/messages → conversation history for that agent
+  // The PWA calls these on first paint to populate tabs + message lists.
+  if (url === '/api/agents') {
+    const safe = AGENTS.map((a) => ({
+      id: a.id,
+      displayName: a.displayName,
+      description: a.description,
+      emoji: a.emoji,
+      color: a.color
+    }))
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+    })
+    res.end(JSON.stringify(safe))
+    return
+  }
+  const msgsMatch = url.match(/^\/api\/agents\/([a-z0-9_-]+)\/messages$/i)
+  if (msgsMatch) {
+    const agentId = msgsMatch[1]
+    if (!AGENTS.find((a) => a.id === agentId)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'agent not found' }))
+      return
+    }
+    const messages = listMessages(agentId)
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+    })
+    res.end(JSON.stringify(messages))
+    return
+  }
+
   const file = STATIC_ROUTES[url]
   if (!file) {
     res.writeHead(404, { 'Content-Type': 'text/plain' })
@@ -228,6 +273,12 @@ function handleWsConnection(ws: WebSocket): void {
       for (const l of voiceListeners) l('end')
     } else if (msg.type === 'cancel') {
       for (const l of cancelListeners) l()
+    } else if (msg.type === 'sendText') {
+      const agentId = typeof msg.agentId === 'string' ? msg.agentId : ''
+      const text = typeof msg.text === 'string' ? msg.text : ''
+      if (agentId && text.trim()) {
+        for (const l of sendTextListeners) l(agentId, text)
+      }
     }
   })
 

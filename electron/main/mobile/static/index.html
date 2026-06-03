@@ -15,56 +15,72 @@
 </head>
 <body>
   <div class="app">
+    <!-- Top: brand + connection status, very compact -->
     <header>
       <div class="brand">
         <img src="/icon.png" alt="NEXUS" class="brand-icon" />
-        <div>
+        <div class="brand-text">
           <h1>NEXUS</h1>
-          <span class="subtitle">Mobile Companion</span>
+          <span class="subtitle">Mobile</span>
         </div>
       </div>
       <span id="conn-status" class="conn-status disconnected">desconectado</span>
     </header>
 
-    <main>
-      <div class="orb-container">
-        <div id="orb" class="orb idle">
-          <div class="orb-inner"></div>
-          <div class="orb-ring"></div>
-        </div>
-        <p id="state-label" class="state-label">Aguardando…</p>
-      </div>
+    <!-- Agent tabs (horizontally scrollable) -->
+    <nav id="agent-tabs" class="agent-tabs" role="tablist">
+      <!-- buttons injected by JS -->
+    </nav>
 
-      <div id="buffer" class="buffer hidden"></div>
+    <!-- Description / wake-word hint for currently-selected agent -->
+    <p id="agent-hint" class="agent-hint"></p>
 
-      <div id="reply-card" class="reply-card hidden">
-        <div class="reply-header">
-          <span id="reply-agent">Octopus</span>
-          <span id="reply-cost" class="reply-cost"></span>
-        </div>
-        <div id="reply-content" class="reply-content"></div>
+    <!-- Message list — the centerpiece. Bubbles for user (right) and assistant (left). -->
+    <main id="message-list" class="message-list">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon"></div>
+        <p class="empty-title">Sem mensagens ainda</p>
+        <p class="empty-hint">Diga "<span id="empty-wake">octopus claude …</span> ok" ou digita aí embaixo.</p>
       </div>
     </main>
 
+    <!-- Floating orb + state label (compact, on top of input area) -->
+    <div class="state-row">
+      <div id="orb" class="orb idle">
+        <div class="orb-inner"></div>
+        <div class="orb-ring"></div>
+      </div>
+      <div class="state-text">
+        <span id="state-label" class="state-label">Aguardando…</span>
+        <span id="buffer" class="buffer-text"></span>
+      </div>
+    </div>
+
+    <!-- Bottom: cancel (when relevant) + text input + send + pause mic toggle -->
     <footer>
-      <!--
-        Cancel button — only visible during 'listening' (capturing prompt)
-        or 'thinking' (API call in flight). Pressing it tells the Mac to
-        wakeService.cancel() which aborts the Anthropic request so we don't
-        get billed for a response we won't see.
-      -->
       <button id="cancel-btn" class="cancel-btn hidden" aria-label="Cancelar prompt em andamento">
         <span class="cancel-icon" aria-hidden="true">✕</span>
         <span class="cancel-text">Cancelar</span>
       </button>
 
+      <div class="input-row">
+        <textarea
+          id="text-input"
+          class="text-input"
+          placeholder="Mensagem ou aperte o mic"
+          rows="1"
+        ></textarea>
+        <button id="send-btn" class="send-btn" disabled aria-label="Enviar mensagem">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"/>
+            <polyline points="5 12 12 5 19 12"/>
+          </svg>
+        </button>
+      </div>
+
       <button id="toggle" class="toggle-btn off">
         <span class="toggle-text">Ativar mic</span>
       </button>
-      <p class="hint">
-        Diga <strong>"Nexus, [comando] ok"</strong> ou
-        <strong>"Octopus claude [prompt] ok"</strong>
-      </p>
     </footer>
   </div>
 

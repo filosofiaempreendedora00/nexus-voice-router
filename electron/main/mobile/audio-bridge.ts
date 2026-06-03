@@ -1,7 +1,8 @@
 import { wakeService } from '../voice/wake-service'
-import { onAudio, onVoiceEvent, onCancel, broadcast } from './server'
+import { onAudio, onVoiceEvent, onCancel, onSendText, broadcast } from './server'
 import { agentEvents } from '../agents/agent-events'
 import { getAgent } from '../agents/agent-config'
+import { sendToAgent } from './../agents/agent-claude'
 
 /**
  * Wires the mobile WebSocket plumbing into the existing wake-service so the
@@ -33,6 +34,16 @@ export function bindMobileAudioBridge(): void {
   // in-flight Anthropic call and resets state to idle.
   unbinds.push(onCancel(() => {
     wakeService.cancel()
+  }))
+
+  // 2c. Typed text from the PWA's chat input → route directly to the agent
+  // (bypassing Whisper / wake-word entirely). Errors come back through the
+  // sendToAgent return; we don't broadcast anything extra because the agent
+  // event bus already pushes user+assistant messages to the connected phones.
+  unbinds.push(onSendText((agentId, text) => {
+    void sendToAgent(agentId, text).catch((err) => {
+      console.error('[audio-bridge] sendText failed:', err)
+    })
   }))
 
   // 3. Wake status from Mac → broadcast to phones so the phone HUD mirrors.
