@@ -66,6 +66,19 @@ let currentKind: TunnelKind = 'none'
 let currentUrl: string | undefined
 let currentState: TunnelStatus['state'] = 'stopped'
 let currentError: string | undefined
+/**
+ * Counts consecutive Tailscale funnel restart attempts. Reset to zero once
+ * a fresh funnel URL is observed. Used to back off exponentially when the
+ * funnel keeps dying (Mac wake-from-sleep, daemon restart, network change).
+ */
+let tailscaleRestartAttempts = 0
+/**
+ * Pending retry timer so we can cancel it when user explicitly stops the
+ * tunnel or when the app shuts down.
+ */
+let tailscaleRetryTimer: NodeJS.Timeout | null = null
+const TAILSCALE_MAX_RESTART_ATTEMPTS = 5
+
 const listeners = new Set<Listener>()
 
 export function onTunnelStatus(fn: Listener): () => void {
@@ -219,6 +232,9 @@ export async function getStatusAsync(): Promise<TunnelStatus> {
 
 export async function startTunnel(port: number): Promise<TunnelStatus> {
   if (proc) return getStatusAsync()
+  // A user-initiated start is a fresh slate — reset the auto-restart counter
+  // so internal retries don't bleed across user actions.
+  tailscaleRestartAttempts = 0
 
   const choice = await chooseBackend()
   if (choice === 'tailscale') {
@@ -235,6 +251,13 @@ export function stopTunnel(): void {
   currentState = 'stopped'
   currentError = undefined
   currentUrl = undefined
+  // Cancel any pending Tailscale auto-restart so a stale retry doesn't
+  // spawn a new funnel right after the user clicked Desligar.
+  if (tailscaleRetryTimer) {
+    clearTimeout(tailscaleRetryTimer)
+    tailscaleRetryTimer = null
+  }
+  tailscaleRestartAttempts = 0
   if (proc) {
     try { proc.kill('SIGTERM') } catch { /* */ }
     proc = null
@@ -311,6 +334,9 @@ async function startTailscale(port: number): Promise<TunnelStatus> {
       if (m) {
         currentUrl = m[0]
         currentState = 'running'
+        // A fresh URL means the tunnel came up cleanly — reset the
+        // restart-attempt counter so a future death gets a full budget again.
+        tailscaleRestartAttempts = 0
         console.log('[tunnel/tailscale] up:', currentUrl)
         notify()
       }
@@ -339,10 +365,48 @@ async function startTailscale(port: number): Promise<TunnelStatus> {
   proc.on('exit', (code, signal) => {
     console.log('[tunnel/tailscale] exited', code, signal)
     proc = null
-    if (currentState !== 'stopped') {
-      currentState = 'error'
-      if (!currentError) currentError = `tailscale funnel encerrou (${code ?? signal})`
+
+    // If the user explicitly stopped the tunnel (or chose a different
+    // backend), don't retry — they meant it.
+    if (currentState === 'stopped') {
+      currentUrl = undefined
+      notify()
+      return
     }
+
+    // The funnel died on us. Common reasons: Mac woke from sleep and the
+    // Tailscale daemon reconnected, network changed, or the daemon was
+    // updated by macOS in the background. Auto-restart with exponential
+    // backoff so Roberto doesn't have to come back here every time.
+    tailscaleRestartAttempts += 1
+    if (tailscaleRestartAttempts <= TAILSCALE_MAX_RESTART_ATTEMPTS) {
+      const delayMs = Math.min(1000 * Math.pow(2, tailscaleRestartAttempts - 1), 16000)
+      console.log(
+        `[tunnel/tailscale] auto-restart ${tailscaleRestartAttempts}/${TAILSCALE_MAX_RESTART_ATTEMPTS} in ${delayMs}ms`
+      )
+      currentUrl = undefined
+      currentState = 'starting'
+      currentError = `Reconectando… (tentativa ${tailscaleRestartAttempts}/${TAILSCALE_MAX_RESTART_ATTEMPTS})`
+      notify()
+      if (tailscaleRetryTimer) clearTimeout(tailscaleRetryTimer)
+      tailscaleRetryTimer = setTimeout(() => {
+        tailscaleRetryTimer = null
+        // Bail if user stopped during the wait
+        if (currentState === 'stopped' || currentKind !== 'tailscale') return
+        void startTailscale(port).catch((err) => {
+          console.error('[tunnel/tailscale] retry failed:', err)
+        })
+      }, delayMs)
+      return
+    }
+
+    // Budget exhausted — surface a clear error + the Reconectar button takes
+    // over from here (Mobile UI binds it to disable→enable).
+    console.warn('[tunnel/tailscale] auto-restart budget exhausted, giving up')
+    currentState = 'error'
+    currentError =
+      `Tailscale funnel caiu ${TAILSCALE_MAX_RESTART_ATTEMPTS} vezes seguidas. ` +
+      `Toque "Reconectar" pra reiniciar do zero, ou abra o app Tailscale e veja se está "Connected".`
     currentUrl = undefined
     notify()
   })

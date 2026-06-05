@@ -185,9 +185,38 @@ export function Mobile(): JSX.Element {
                 )}
 
                 {status.tunnel.error && (
-                  <div className="text-sm text-danger flex items-start gap-2">
-                    <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                    <span>{status.tunnel.error}</span>
+                  <div className="flex flex-col gap-3">
+                    <div className="text-sm text-danger flex items-start gap-2">
+                      <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                      <span>{status.tunnel.error}</span>
+                    </div>
+                    {/* Big "Reconectar" button when the funnel keeps dying.
+                        Does a full disable→enable cycle, which kills any
+                        zombie funnel config and starts fresh. Roberto can
+                        hit this from the Mobile page instead of asking us. */}
+                    {status.tunnel.state === 'error' && status.enabled && (
+                      <button
+                        onClick={async () => {
+                          setBusy(true)
+                          try {
+                            await api.mobileDisable()
+                            await new Promise((r) => setTimeout(r, 800))
+                            const next = await api.mobileEnable()
+                            setStatus(next)
+                            toast.show('success', 'Reconectando…')
+                          } catch (err) {
+                            toast.show('error', String(err))
+                          } finally {
+                            setBusy(false)
+                          }
+                        }}
+                        disabled={busy}
+                        className="h-11 px-4 rounded-lg bg-accent text-white hover:bg-accent-hover transition-all font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+                      >
+                        {busy && <Loader2 size={14} className="animate-spin" />}
+                        Reconectar do zero
+                      </button>
+                    )}
                   </div>
                 )}
 
